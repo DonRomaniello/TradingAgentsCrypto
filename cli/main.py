@@ -55,7 +55,8 @@ class MessageBuffer:
         "market": "Market Analyst",
         "social": "Social Analyst",
         "news": "News Analyst",
-        "fundamentals": "Fundamentals Analyst",
+        "tokenomics": "Tokenomics Analyst",
+        "derivatives": "Derivatives Analyst",
     }
 
     # Report section mapping: section -> (analyst_key for filtering, finalizing_agent)
@@ -65,7 +66,8 @@ class MessageBuffer:
         "market_report": ("market", "Market Analyst"),
         "sentiment_report": ("social", "Social Analyst"),
         "news_report": ("news", "News Analyst"),
-        "fundamentals_report": ("fundamentals", "Fundamentals Analyst"),
+        "tokenomics_report": ("tokenomics", "Tokenomics Analyst"),
+        "derivatives_report": ("derivatives", "Derivatives Analyst"),
         "investment_plan": (None, "Research Manager"),
         "trader_investment_plan": (None, "Trader"),
         "final_trade_decision": (None, "Portfolio Manager"),
@@ -173,7 +175,8 @@ class MessageBuffer:
                 "market_report": "Market Analysis",
                 "sentiment_report": "Social Sentiment",
                 "news_report": "News Analysis",
-                "fundamentals_report": "Fundamentals Analysis",
+                "tokenomics_report": "Tokenomics Analysis",
+                "derivatives_report": "Derivatives / On-Chain Analysis",
                 "investment_plan": "Research Team Decision",
                 "trader_investment_plan": "Trading Team Plan",
                 "final_trade_decision": "Portfolio Management Decision",
@@ -189,7 +192,7 @@ class MessageBuffer:
         report_parts = []
 
         # Analyst Team Reports - use .get() to handle missing sections
-        analyst_sections = ["market_report", "sentiment_report", "news_report", "fundamentals_report"]
+        analyst_sections = ["market_report", "sentiment_report", "news_report", "tokenomics_report", "derivatives_report"]
         if any(self.report_sections.get(section) for section in analyst_sections):
             report_parts.append("## Analyst Team Reports")
             if self.report_sections.get("market_report"):
@@ -204,9 +207,13 @@ class MessageBuffer:
                 report_parts.append(
                     f"### News Analysis\n{self.report_sections['news_report']}"
                 )
-            if self.report_sections.get("fundamentals_report"):
+            if self.report_sections.get("tokenomics_report"):
                 report_parts.append(
-                    f"### Fundamentals Analysis\n{self.report_sections['fundamentals_report']}"
+                    f"### Tokenomics Analysis\n{self.report_sections['tokenomics_report']}"
+                )
+            if self.report_sections.get("derivatives_report"):
+                report_parts.append(
+                    f"### Derivatives / On-Chain Analysis\n{self.report_sections['derivatives_report']}"
                 )
 
         # Research Team Reports
@@ -286,7 +293,8 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
             "Market Analyst",
             "Social Analyst",
             "News Analyst",
-            "Fundamentals Analyst",
+            "Tokenomics Analyst",
+            "Derivatives Analyst",
         ],
         "Research Team": ["Bull Researcher", "Bear Researcher", "Research Manager"],
         "Trading Team": ["Trader"],
@@ -502,9 +510,9 @@ def get_user_selections():
     # Step 1: Ticker symbol
     console.print(
         create_question_box(
-            "Step 1: Ticker Symbol",
-            "Enter the exact ticker symbol to analyze, including exchange suffix when needed (examples: SPY, CNC.TO, 7203.T, 0700.HK)",
-            "SPY",
+            "Step 1: Crypto Pair",
+            "Enter the crypto pair to analyze (examples: BTC/USDT, ETH/USD, SOL/USDT, binance:DOGE/USDT)",
+            "BTC/USDT",
         )
     )
     selected_ticker = get_ticker()
@@ -613,8 +621,8 @@ def get_user_selections():
 
 
 def get_ticker():
-    """Get ticker symbol from user input."""
-    return typer.prompt("", default="SPY")
+    """Get crypto pair from user input."""
+    return typer.prompt("", default="BTC/USDT")
 
 
 def get_analysis_date():
@@ -656,10 +664,14 @@ def save_report_to_disk(final_state, ticker: str, save_path: Path):
         analysts_dir.mkdir(exist_ok=True)
         (analysts_dir / "news.md").write_text(final_state["news_report"], encoding="utf-8")
         analyst_parts.append(("News Analyst", final_state["news_report"]))
-    if final_state.get("fundamentals_report"):
+    if final_state.get("tokenomics_report"):
         analysts_dir.mkdir(exist_ok=True)
-        (analysts_dir / "fundamentals.md").write_text(final_state["fundamentals_report"], encoding="utf-8")
-        analyst_parts.append(("Fundamentals Analyst", final_state["fundamentals_report"]))
+        (analysts_dir / "tokenomics.md").write_text(final_state["tokenomics_report"], encoding="utf-8")
+        analyst_parts.append(("Tokenomics Analyst", final_state["tokenomics_report"]))
+    if final_state.get("derivatives_report"):
+        analysts_dir.mkdir(exist_ok=True)
+        (analysts_dir / "derivatives.md").write_text(final_state["derivatives_report"], encoding="utf-8")
+        analyst_parts.append(("Derivatives Analyst", final_state["derivatives_report"]))
     if analyst_parts:
         content = "\n\n".join(f"### {name}\n{text}" for name, text in analyst_parts)
         sections.append(f"## I. Analyst Team Reports\n\n{content}")
@@ -739,8 +751,10 @@ def display_complete_report(final_state):
         analysts.append(("Social Analyst", final_state["sentiment_report"]))
     if final_state.get("news_report"):
         analysts.append(("News Analyst", final_state["news_report"]))
-    if final_state.get("fundamentals_report"):
-        analysts.append(("Fundamentals Analyst", final_state["fundamentals_report"]))
+    if final_state.get("tokenomics_report"):
+        analysts.append(("Tokenomics Analyst", final_state["tokenomics_report"]))
+    if final_state.get("derivatives_report"):
+        analysts.append(("Derivatives Analyst", final_state["derivatives_report"]))
     if analysts:
         console.print(Panel("[bold]I. Analyst Team Reports[/bold]", border_style="cyan"))
         for title, content in analysts:
@@ -795,18 +809,20 @@ def update_research_team_status(status):
 
 
 # Ordered list of analysts for status transitions
-ANALYST_ORDER = ["market", "social", "news", "fundamentals"]
+ANALYST_ORDER = ["market", "social", "news", "tokenomics", "derivatives"]
 ANALYST_AGENT_NAMES = {
     "market": "Market Analyst",
     "social": "Social Analyst",
     "news": "News Analyst",
-    "fundamentals": "Fundamentals Analyst",
+    "tokenomics": "Tokenomics Analyst",
+    "derivatives": "Derivatives Analyst",
 }
 ANALYST_REPORT_MAP = {
     "market": "market_report",
     "social": "sentiment_report",
     "news": "news_report",
-    "fundamentals": "fundamentals_report",
+    "tokenomics": "tokenomics_report",
+    "derivatives": "derivatives_report",
 }
 
 

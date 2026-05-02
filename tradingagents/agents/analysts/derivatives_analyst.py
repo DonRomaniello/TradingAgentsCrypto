@@ -1,33 +1,30 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from tradingagents.agents.utils.agent_utils import (
-    build_instrument_context,
-    get_balance_sheet,
-    get_cashflow,
-    get_fundamentals,
-    get_income_statement,
-    get_insider_transactions,
-    get_language_instruction,
+from tradingagents.agents.utils.agent_utils import build_instrument_context, get_language_instruction
+from tradingagents.agents.utils.derivatives_data_tools import (
+    get_funding_rate,
+    get_open_interest,
+    get_long_short_ratio,
+    get_liquidations,
 )
-from tradingagents.dataflows.config import get_config
 
 
-def create_fundamentals_analyst(llm):
-    def fundamentals_analyst_node(state):
+def create_derivatives_analyst(llm):
+    def derivatives_analyst_node(state):
         current_date = state["trade_date"]
         instrument_context = build_instrument_context(state["instrument"])
 
-        tools = [
-            get_fundamentals,
-            get_balance_sheet,
-            get_cashflow,
-            get_income_statement,
-        ]
+        tools = [get_funding_rate, get_open_interest, get_long_short_ratio, get_liquidations]
 
         system_message = (
-            "You are a researcher tasked with analyzing fundamental information over the past week about a company. Please write a comprehensive report of the company's fundamental information such as financial documents, company profile, basic company financials, and company financial history to gain a full view of the company's fundamental information to inform traders. Make sure to include as much detail as possible. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
-            + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
-            + " Use the available tools: `get_fundamentals` for comprehensive company analysis, `get_balance_sheet`, `get_cashflow`, and `get_income_statement` for specific financial statements."
-            + get_language_instruction(),
+            "You analyze derivatives market structure: funding rates (positive = longs paying = crowded long), "
+            "open interest trends, long/short imbalance, and recent liquidation cascades. "
+            "Flag funding > 0.1% per 8h or < -0.05% per 8h as extreme positioning. "
+            "OI rising with price = healthy trend confirming buyers in control; "
+            "OI rising with price falling = bearish divergence (shorts piling in). "
+            "Large liquidation spikes often precede or accompany sharp reversals. "
+            "Use all four tools to build a complete picture of derivatives positioning."
+            + " Make sure to append a Markdown table at the end of the report to organize key points, organized and easy to read."
+            + get_language_instruction()
         )
 
         prompt = ChatPromptTemplate.from_messages(
@@ -48,22 +45,20 @@ def create_fundamentals_analyst(llm):
         )
 
         prompt = prompt.partial(system_message=system_message)
-        prompt = prompt.partial(tool_names=", ".join([tool.name for tool in tools]))
+        prompt = prompt.partial(tool_names=", ".join([t.name for t in tools]))
         prompt = prompt.partial(current_date=current_date)
         prompt = prompt.partial(instrument_context=instrument_context)
 
         chain = prompt | llm.bind_tools(tools)
-
         result = chain.invoke(state["messages"])
 
         report = ""
-
         if len(result.tool_calls) == 0:
             report = result.content
 
         return {
             "messages": [result],
-            "fundamentals_report": report,
+            "derivatives_report": report,
         }
 
-    return fundamentals_analyst_node
+    return derivatives_analyst_node

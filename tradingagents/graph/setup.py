@@ -27,7 +27,7 @@ class GraphSetup:
         self.conditional_logic = conditional_logic
 
     def setup_graph(
-        self, selected_analysts=["market", "social", "news", "fundamentals"]
+        self, selected_analysts=["market", "social", "news", "tokenomics"]
     ):
         """Set up and compile the agent workflow graph.
 
@@ -36,7 +36,8 @@ class GraphSetup:
                 - "market": Market analyst
                 - "social": Social media analyst
                 - "news": News analyst
-                - "fundamentals": Fundamentals analyst
+                - "tokenomics": Tokenomics analyst (replaces fundamentals)
+                - "derivatives": On-chain / derivatives analyst
         """
         if len(selected_analysts) == 0:
             raise ValueError("Trading Agents Graph Setup Error: no analysts selected!")
@@ -67,12 +68,19 @@ class GraphSetup:
             delete_nodes["news"] = create_msg_delete()
             tool_nodes["news"] = self.tool_nodes["news"]
 
-        if "fundamentals" in selected_analysts:
-            analyst_nodes["fundamentals"] = create_fundamentals_analyst(
+        if "tokenomics" in selected_analysts:
+            analyst_nodes["tokenomics"] = create_tokenomics_analyst(
                 self.quick_thinking_llm
             )
-            delete_nodes["fundamentals"] = create_msg_delete()
-            tool_nodes["fundamentals"] = self.tool_nodes["fundamentals"]
+            delete_nodes["tokenomics"] = create_msg_delete()
+            tool_nodes["tokenomics"] = self.tool_nodes["tokenomics"]
+
+        if "derivatives" in selected_analysts:
+            analyst_nodes["derivatives"] = create_derivatives_analyst(
+                self.quick_thinking_llm
+            )
+            delete_nodes["derivatives"] = create_msg_delete()
+            tool_nodes["derivatives"] = self.tool_nodes["derivatives"]
 
         # Create researcher and manager nodes
         bull_researcher_node = create_bull_researcher(self.quick_thinking_llm)

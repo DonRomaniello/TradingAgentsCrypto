@@ -7,8 +7,6 @@ import json
 from datetime import datetime, timedelta
 from typing import Dict, Any, Tuple, List, Optional
 
-import yfinance as yf
-
 logger = logging.getLogger(__name__)
 
 from langgraph.prebuilt import ToolNode
@@ -25,18 +23,14 @@ from tradingagents.agents.utils.agent_states import (
     RiskDebateState,
 )
 from tradingagents.dataflows.config import set_config
+from tradingagents.dataflows.ccxt_market_data import get_ohlcv
 
-# Import the new abstract tool methods from agent_utils
+# Import tool methods from agent_utils
 from tradingagents.agents.utils.agent_utils import (
-    get_stock_data,
+    get_market_data,
     get_indicators,
-    get_fundamentals,
-    get_balance_sheet,
-    get_cashflow,
-    get_income_statement,
     get_news,
-    get_insider_transactions,
-    get_global_news
+    get_global_news,
 )
 
 from .checkpointer import checkpoint_step, clear_checkpoint, get_checkpointer, thread_id
@@ -52,7 +46,7 @@ class TradingAgentsGraph:
 
     def __init__(
         self,
-        selected_analysts=["market", "social", "news", "fundamentals"],
+        selected_analysts=["market", "social", "news", "tokenomics"],
         debug=False,
         config: Dict[str, Any] = None,
         callbacks: Optional[List] = None,
@@ -153,39 +147,29 @@ class TradingAgentsGraph:
         return kwargs
 
     def _create_tool_nodes(self) -> Dict[str, ToolNode]:
-        """Create tool nodes for different data sources using abstract methods."""
+        """Create tool nodes for different data sources."""
+        from tradingagents.agents.utils.tokenomics_data_tools import (
+            get_tokenomics,
+            get_protocol_metrics,
+        )
+        from tradingagents.agents.utils.derivatives_data_tools import (
+            get_funding_rate,
+            get_open_interest,
+            get_long_short_ratio,
+            get_liquidations,
+        )
+        from tradingagents.agents.utils.social_data_tools import get_social_metrics
         return {
-            "market": ToolNode(
-                [
-                    # Core stock data tools
-                    get_stock_data,
-                    # Technical indicators
-                    get_indicators,
-                ]
-            ),
-            "social": ToolNode(
-                [
-                    # News tools for social media analysis
-                    get_news,
-                ]
-            ),
-            "news": ToolNode(
-                [
-                    # News and insider information
-                    get_news,
-                    get_global_news,
-                    get_insider_transactions,
-                ]
-            ),
-            "fundamentals": ToolNode(
-                [
-                    # Fundamental analysis tools
-                    get_fundamentals,
-                    get_balance_sheet,
-                    get_cashflow,
-                    get_income_statement,
-                ]
-            ),
+            "market": ToolNode([get_market_data, get_indicators]),
+            "social": ToolNode([get_news, get_social_metrics]),
+            "news": ToolNode([get_news, get_global_news]),
+            "tokenomics": ToolNode([get_tokenomics, get_protocol_metrics]),
+            "derivatives": ToolNode([
+                get_funding_rate,
+                get_open_interest,
+                get_long_short_ratio,
+                get_liquidations,
+            ]),
         }
 
     def _fetch_returns(
@@ -193,31 +177,50 @@ class TradingAgentsGraph:
     ) -> Tuple[Optional[float], Optional[float], Optional[int]]:
         """Fetch raw and alpha return for ticker over holding_days from trade_date.
 
+        Uses ccxt for crypto pairs. Benchmarks against the configured
+        reflection_benchmark (default BTC/USDT). Crypto has no market holidays
+        so holding_days is calendar days.
+
         Returns (raw_return, alpha_return, actual_holding_days) or
-        (None, None, None) if price data is unavailable (too recent, delisted,
-        or network error).
+        (None, None, None) if price data is unavailable.
         """
+        from tradingagents.dataflows.symbols import parse_symbol
+        from datetime import timezone
+
         try:
-            start = datetime.strptime(trade_date, "%Y-%m-%d")
-            end = start + timedelta(days=holding_days + 7)  # buffer for weekends/holidays
-            end_str = end.strftime("%Y-%m-%d")
+            start = datetime.strptime(trade_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            end = start + timedelta(days=holding_days + 3)
 
-            stock = yf.Ticker(ticker).history(start=trade_date, end=end_str)
-            spy = yf.Ticker("SPY").history(start=trade_date, end=end_str)
+            benchmark_sym = self.config.get("reflection_benchmark", "BTC/USDT")
 
-            if len(stock) < 2 or len(spy) < 2:
+            try:
+                instrument = parse_symbol(ticker)
+            except ValueError:
+                logger.warning("Cannot parse ticker %r for reflection, skipping", ticker)
                 return None, None, None
 
-            actual_days = min(holding_days, len(stock) - 1, len(spy) - 1)
+            stock_df = get_ohlcv(instrument, "1d", start, end)
+
+            # For BTC itself, benchmark against ETH/USDT to avoid trivial 0 alpha
+            if ticker.upper().startswith("BTC") and benchmark_sym.upper().startswith("BTC"):
+                benchmark_sym = "ETH/USDT"
+
+            benchmark_instrument = parse_symbol(benchmark_sym)
+            bench_df = get_ohlcv(benchmark_instrument, "1d", start, end)
+
+            if len(stock_df) < 2 or len(bench_df) < 2:
+                return None, None, None
+
+            actual_days = min(holding_days, len(stock_df) - 1, len(bench_df) - 1)
             raw = float(
-                (stock["Close"].iloc[actual_days] - stock["Close"].iloc[0])
-                / stock["Close"].iloc[0]
+                (stock_df["close"].iloc[actual_days] - stock_df["close"].iloc[0])
+                / stock_df["close"].iloc[0]
             )
-            spy_ret = float(
-                (spy["Close"].iloc[actual_days] - spy["Close"].iloc[0])
-                / spy["Close"].iloc[0]
+            bench_ret = float(
+                (bench_df["close"].iloc[actual_days] - bench_df["close"].iloc[0])
+                / bench_df["close"].iloc[0]
             )
-            alpha = raw - spy_ret
+            alpha = raw - bench_ret
             return raw, alpha, actual_days
         except Exception as e:
             logger.warning(
@@ -355,7 +358,8 @@ class TradingAgentsGraph:
             "market_report": final_state["market_report"],
             "sentiment_report": final_state["sentiment_report"],
             "news_report": final_state["news_report"],
-            "fundamentals_report": final_state["fundamentals_report"],
+            "tokenomics_report": final_state["tokenomics_report"],
+            "derivatives_report": final_state["derivatives_report"],
             "investment_debate_state": {
                 "bull_history": final_state["investment_debate_state"]["bull_history"],
                 "bear_history": final_state["investment_debate_state"]["bear_history"],

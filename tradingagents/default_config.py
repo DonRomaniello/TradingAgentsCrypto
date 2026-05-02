@@ -35,16 +35,22 @@ DEFAULT_CONFIG = {
     "max_debate_rounds": 1,
     "max_risk_discuss_rounds": 1,
     "max_recur_limit": 100,
+    # Reflection benchmark (crypto pair used as market benchmark in reflection)
+    "reflection_benchmark": "BTC/USDT",
+
     # Data vendor configuration
     # Category-level configuration (default for all tools in category)
     "data_vendors": {
-        "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance
-        "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance
-        "fundamental_data": "yfinance",      # Options: alpha_vantage, yfinance
-        "news_data": "yfinance",             # Options: alpha_vantage, yfinance
+        "market_data": "ccxt",               # OHLCV price data
+        "technical_indicators": "pandas_ta", # Technical analysis indicators
+        "news_data": "cryptopanic",          # Crypto news
+        "social_data": "lunarcrush",         # Social sentiment
+        "onchain_data": "coinglass",         # On-chain / derivatives
+        "derivatives_data": "coinglass",     # Funding rates, OI, liquidations
+        "tokenomics_data": "coingecko",      # Token supply, TVL
     },
     # Tool-level configuration (takes precedence over category-level)
     "tool_vendors": {
-        # Example: "get_stock_data": "alpha_vantage",  # Override category default
+        # Example: "get_market_data": "ccxt",
     },
 }

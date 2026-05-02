@@ -8,21 +8,34 @@ from tradingagents.llm_clients.model_catalog import get_model_options
 
 console = Console()
 
-TICKER_INPUT_EXAMPLES = "Examples: SPY, CNC.TO, 7203.T, 0700.HK"
+TICKER_INPUT_EXAMPLES = "Examples: BTC/USDT, ETH/USD, SOL/USDT, binance:DOGE/USDT"
 
 ANALYST_ORDER = [
     ("Market Analyst", AnalystType.MARKET),
     ("Social Media Analyst", AnalystType.SOCIAL),
     ("News Analyst", AnalystType.NEWS),
-    ("Fundamentals Analyst", AnalystType.FUNDAMENTALS),
+    ("Tokenomics Analyst", AnalystType.TOKENOMICS),
+    ("On-Chain / Derivatives Analyst", AnalystType.DERIVATIVES),
 ]
 
 
 def get_ticker() -> str:
-    """Prompt the user to enter a ticker symbol."""
+    """Prompt the user to enter a crypto pair symbol."""
+    from tradingagents.dataflows.symbols import parse_symbol
+
+    def validate_symbol(x: str) -> bool | str:
+        x = x.strip()
+        if not x:
+            return "Please enter a symbol."
+        try:
+            parse_symbol(x)
+            return True
+        except ValueError as e:
+            return str(e)
+
     ticker = questionary.text(
-        f"Enter the exact ticker symbol to analyze ({TICKER_INPUT_EXAMPLES}):",
-        validate=lambda x: len(x.strip()) > 0 or "Please enter a valid ticker symbol.",
+        f"Enter the crypto pair to analyze ({TICKER_INPUT_EXAMPLES}):",
+        validate=validate_symbol,
         style=questionary.Style(
             [
                 ("text", "fg:green"),
@@ -32,15 +45,19 @@ def get_ticker() -> str:
     ).ask()
 
     if not ticker:
-        console.print("\n[red]No ticker symbol provided. Exiting...[/red]")
+        console.print("\n[red]No symbol provided. Exiting...[/red]")
         exit(1)
 
     return normalize_ticker_symbol(ticker)
 
 
 def normalize_ticker_symbol(ticker: str) -> str:
-    """Normalize ticker input while preserving exchange suffixes."""
-    return ticker.strip().upper()
+    """Normalize ticker: upper-case base/quote, preserve venue prefix."""
+    ticker = ticker.strip()
+    if ":" in ticker:
+        venue, pair = ticker.split(":", 1)
+        return f"{venue.lower()}:{pair.upper()}"
+    return ticker.upper()
 
 
 def get_analysis_date() -> str:

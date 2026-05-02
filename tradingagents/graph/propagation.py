@@ -49,7 +49,8 @@ class Propagator:
                 }
             ),
             "market_report": "",
-            "fundamentals_report": "",
+            "tokenomics_report": "",
+            "derivatives_report": "",
             "sentiment_report": "",
             "news_report": "",
         }

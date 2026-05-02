@@ -14,8 +14,13 @@ class TestSafeTickerComponent(unittest.TestCase):
         for ticker in ("AAPL", "BRK-B", "BRK.A", "0700.HK", "7203.T", "BHP.AX", "^GSPC"):
             self.assertEqual(safe_ticker_component(ticker), ticker)
 
+    def test_accepts_crypto_pair_formats(self):
+        self.assertEqual(safe_ticker_component("BTC/USDT"), "BTC_USDT")
+        self.assertEqual(safe_ticker_component("ETH/USD"), "ETH_USD")
+        self.assertEqual(safe_ticker_component("SOL/USDT"), "SOL_USDT")
+
     def test_rejects_path_separators(self):
-        for bad in (".", "..", "../etc", "a/b", "a\\b", "/abs", "..\\..\\x"):
+        for bad in (".", "..", "../etc", "a\\b", "/abs", "..\\..\\x"):
             with self.assertRaises(ValueError):
                 safe_ticker_component(bad)
 
@@ -45,6 +50,14 @@ class TestSafeTickerComponent(unittest.TestCase):
         base = os.path.realpath("/tmp/cache")
         ticker = safe_ticker_component("AAPL")
         joined = os.path.realpath(os.path.join(base, f"{ticker}.csv"))
+        self.assertTrue(joined.startswith(base + os.sep))
+
+    def test_crypto_pair_sanitized_stays_within_base(self):
+        """Crypto pair with '/' is sanitized to '_' and stays within base."""
+        base = os.path.realpath("/tmp/cache")
+        ticker = safe_ticker_component("BTC/USDT")
+        self.assertEqual(ticker, "BTC_USDT")
+        joined = os.path.realpath(os.path.join(base, f"{ticker}.parquet"))
         self.assertTrue(joined.startswith(base + os.sep))
 
 

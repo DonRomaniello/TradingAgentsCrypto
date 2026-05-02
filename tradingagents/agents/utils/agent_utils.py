@@ -38,8 +38,8 @@ def build_instrument_context(ticker: str) -> str:
     """Describe the exact instrument so agents preserve exchange-qualified tickers."""
     return (
         f"The instrument to analyze is `{ticker}`. "
-        "Use this exact ticker in every tool call, report, and recommendation, "
-        "preserving any exchange suffix (e.g. `.TO`, `.L`, `.HK`, `.T`)."
+        "Use this exact symbol in every tool call, report, and recommendation, "
+        "preserving the exact format (e.g. `BTC/USDT`, `binance:ETH/USDT`, `SOL/USDT`)."
     )
 
 def create_msg_delete():

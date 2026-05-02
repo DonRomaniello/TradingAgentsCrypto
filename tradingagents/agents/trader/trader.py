@@ -18,7 +18,7 @@ def create_trader(llm):
     structured_llm = bind_structured(llm, TraderProposal, "Trader")
 
     def trader_node(state, name):
-        company_name = state["company_of_interest"]
+        company_name = state["instrument"]
         instrument_context = build_instrument_context(company_name)
         investment_plan = state["investment_plan"]
 

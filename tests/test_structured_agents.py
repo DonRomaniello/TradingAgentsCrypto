@@ -94,7 +94,7 @@ class TestRenderResearchPlan:
 
 def _make_trader_state():
     return {
-        "company_of_interest": "NVDA",
+        "instrument": "NVDA",
         "investment_plan": "**Recommendation**: Buy\n**Rationale**: ...\n**Strategic Actions**: ...",
     }
 
@@ -167,7 +167,7 @@ class TestTraderAgent:
 
 def _make_rm_state():
     return {
-        "company_of_interest": "NVDA",
+        "instrument": "NVDA",
         "investment_debate_state": {
             "history": "Bull and bear arguments here.",
             "bull_history": "Bull says...",

@@ -7,14 +7,15 @@ from typing import Annotated
 
 SavePathType = Annotated[str, "File path to save data. If None, data is not saved."]
 
-# Tickers can contain letters, digits, dot, dash, underscore, and caret
-# (for index symbols like ^GSPC). Anything else is rejected so the value
-# never escapes a containing directory when interpolated into a path.
-_TICKER_PATH_RE = re.compile(r"^[A-Za-z0-9._\-\^]+$")
+# Tickers can contain letters, digits, dot, dash, underscore, caret
+# (for index symbols like ^GSPC), and forward slash (for crypto pairs like
+# BTC/USDT). Anything else is rejected so the value never escapes a
+# containing directory when interpolated into a path.
+_TICKER_PATH_RE = re.compile(r"^[A-Za-z0-9._\-\^/]+$")
 
 
 def safe_ticker_component(value: str, *, max_len: int = 32) -> str:
-    """Validate ``value`` is safe to interpolate into a filesystem path.
+    """Validate ``value`` is safe to use as a filesystem path component.
 
     Tickers come from user CLI input or from LLM tool calls, both of which
     can be influenced by attacker-controlled content (e.g. prompt injection
@@ -22,8 +23,10 @@ def safe_ticker_component(value: str, *, max_len: int = 32) -> str:
     ``"../../../etc/foo"`` flows into ``os.path.join`` / ``Path /`` and
     escapes the configured cache, checkpoint, or results directory.
 
-    Returns ``value`` unchanged when it matches the allowed pattern; raises
-    ``ValueError`` otherwise.
+    Accepts crypto pair notation (e.g. ``"BTC/USDT"``, ``"ETH-USD"``) and
+    returns a sanitized version safe for path use (``/`` → ``_``).
+
+    Returns a path-safe string; raises ``ValueError`` on bad input.
     """
     if not isinstance(value, str) or not value:
         raise ValueError(f"ticker must be a non-empty string, got {value!r}")
@@ -33,12 +36,17 @@ def safe_ticker_component(value: str, *, max_len: int = 32) -> str:
         raise ValueError(
             f"ticker contains characters not allowed in a filesystem path: {value!r}"
         )
-    # The regex above allows '.', so values like '.', '..', '...' would pass,
-    # and as a path component they traverse the parent directory. Reject any
-    # value that's only dots.
-    if set(value) == {"."}:
+    # Reject path-traversal sequences: leading slash, backslash, or '..' segment.
+    if value.startswith("/") or "\\" in value:
+        raise ValueError(f"ticker must not start with '/' or contain '\\': {value!r}")
+    parts = value.replace("/", "_").split("_")
+    if any(p == ".." for p in value.split("/")):
+        raise ValueError(f"ticker contains path traversal sequence: {value!r}")
+    # Reject values that are only dots (e.g. '.', '..', '...')
+    if set(value.replace("/", "").replace("_", "")) == {"."} or value in (".", ".."):
         raise ValueError(f"ticker cannot consist solely of dots: {value!r}")
-    return value
+    # Sanitize: replace '/' with '_' so the result is a single path component.
+    return value.replace("/", "_")
 
 
 def save_output(data: pd.DataFrame, tag: str, save_path: SavePathType = None) -> None:

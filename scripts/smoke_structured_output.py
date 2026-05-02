@@ -56,7 +56,7 @@ export restrictions still cap a meaningful portion of demand.
 
 def _make_rm_state():
     return {
-        "company_of_interest": "NVDA",
+        "instrument": "NVDA",
         "investment_debate_state": {
             "history": DEBATE_HISTORY,
             "bull_history": "Bull Analyst: NVDA's data-center revenue grew 60% YoY...",
@@ -70,14 +70,14 @@ def _make_rm_state():
 
 def _make_trader_state(investment_plan: str):
     return {
-        "company_of_interest": "NVDA",
+        "instrument": "NVDA",
         "investment_plan": investment_plan,
     }
 
 
 def _make_pm_state(investment_plan: str, trader_plan: str):
     return {
-        "company_of_interest": "NVDA",
+        "instrument": "NVDA",
         "past_context": "",
         "risk_debate_state": {
             "history": "Aggressive: lean in. Conservative: trim. Neutral: balanced sizing.",

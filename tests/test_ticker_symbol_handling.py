@@ -12,9 +12,9 @@ class TickerSymbolHandlingTests(unittest.TestCase):
         self.assertEqual(normalize_ticker_symbol(" cnc.to "), "CNC.TO")
 
     def test_build_instrument_context_mentions_exact_symbol(self):
-        context = build_instrument_context("7203.T")
-        self.assertIn("7203.T", context)
-        self.assertIn("exchange suffix", context)
+        context = build_instrument_context("BTC/USDT")
+        self.assertIn("BTC/USDT", context)
+        self.assertIn("exact", context)
 
 
 if __name__ == "__main__":

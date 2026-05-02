@@ -61,7 +61,7 @@ def _price_df(prices):
 def _make_pm_state(past_context=""):
     """Minimal AgentState dict for portfolio_manager_node."""
     return {
-        "company_of_interest": "NVDA",
+        "instrument": "NVDA",
         "past_context": past_context,
         "risk_debate_state": {
             "history": "Risk debate history.",
@@ -733,7 +733,7 @@ class TestLegacyRemoval:
 
         fake_state = {
             "final_trade_decision": "Rating: Buy\nBuy NVDA.",
-            "company_of_interest": "NVDA",
+            "instrument": "NVDA",
             "trade_date": "2026-01-10",
             "market_report": "",
             "sentiment_report": "",

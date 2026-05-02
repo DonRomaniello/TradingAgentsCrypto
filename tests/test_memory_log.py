@@ -734,7 +734,7 @@ class TestLegacyRemoval:
             "market_report": "",
             "sentiment_report": "",
             "news_report": "",
-            "fundamentals_report": "",
+            "tokenomics_report": "",
             "investment_debate_state": {
                 "bull_history": "", "bear_history": "", "history": "",
                 "current_response": "", "judge_decision": "",

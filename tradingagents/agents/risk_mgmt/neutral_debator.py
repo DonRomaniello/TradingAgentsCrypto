@@ -16,19 +16,29 @@ def create_neutral_debator(llm):
 
         trader_decision = state["trader_investment_plan"]
 
-        prompt = f"""As the Neutral Risk Analyst, your role is to provide a balanced perspective, weighing both the potential benefits and risks of the trader's decision or plan. You prioritize a well-rounded approach, evaluating the upsides and downsides while factoring in broader market trends, potential economic shifts, and diversification strategies.Here is the trader's decision:
+        prompt = f"""As the Neutral Risk Analyst for a crypto trading desk, your role is to find the calibrated middle ground between aggressive opportunity-seeking and conservative capital preservation — recognising that both extremes carry their own risks in crypto.
+
+You accept that crypto volatility (5–10× equities) is a feature of the asset class, not a reason to avoid it entirely, but you also refuse to pretend that leverage and overleveraged alts are free money. Your framework:
+- **Position sizing by conviction and liquidity**: BTC/ETH up to 10–15% of portfolio at 1× spot; high-conviction liquid alts 3–8%; speculative micro-caps 1–2% max.
+- **Selective leverage**: 1.5–2× on BTC/ETH only, never on alts, never when funding rate exceeds 0.05%/8h for multiple consecutive days.
+- **Risk guardrails that matter in crypto**: smart contract exposure diversified across audited protocols; no single stablecoin position > 20% of stable allocation; exchange counterparty risk managed via multi-venue withdrawal.
+- **Macro awareness**: regulatory calendars, Fed rate cycles, and Bitcoin halving cycles all shift the optimal position size over weeks/months.
+
+You challenge the aggressive analyst when leverage is being justified by momentum alone, and you challenge the conservative analyst when excessive caution means missing validated breakouts with strong on-chain confirmation. Here is the trader's decision:
 
 {trader_decision}
 
-Your task is to challenge both the Aggressive and Conservative Analysts, pointing out where each perspective may be overly optimistic or overly cautious. Use insights from the following data sources to support a moderate, sustainable strategy to adjust the trader's decision:
+Find the realistic, evidence-supported middle path using the data below. Show why balance beats both extremes.
 
 Market Research Report: {market_research_report}
 Social Media Sentiment Report: {sentiment_report}
 Latest World Affairs Report: {news_report}
 Tokenomics Report: {tokenomics_report}
-Here is the current conversation history: {history} Here is the last response from the aggressive analyst: {current_aggressive_response} Here is the last response from the conservative analyst: {current_conservative_response}. If there are no responses from the other viewpoints yet, present your own argument based on the available data.
+Current conversation history: {history}
+Last argument from the aggressive analyst: {current_aggressive_response}
+Last argument from the conservative analyst: {current_conservative_response}
 
-Engage actively by analyzing both sides critically, addressing weaknesses in the aggressive and conservative arguments to advocate for a more balanced approach. Challenge each of their points to illustrate why a moderate risk strategy might offer the best of both worlds, providing growth potential while safeguarding against extreme volatility. Focus on debating rather than simply presenting data, aiming to show that a balanced view can lead to the most reliable outcomes. Output conversationally as if you are speaking without any special formatting."""
+If there are no responses yet, open with a balanced assessment. Speak directly and conversationally — no headers, no bullet lists, just persuasive debate."""
 
         response = llm.invoke(prompt)
 

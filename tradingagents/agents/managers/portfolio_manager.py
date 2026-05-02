@@ -39,7 +39,7 @@ def create_portfolio_manager(llm):
             else ""
         )
 
-        prompt = f"""As the Portfolio Manager, synthesize the risk analysts' debate and deliver the final trading decision.
+        prompt = f"""As the Portfolio Manager for a crypto trading desk, synthesize the risk analysts' debate and deliver the final trading decision.
 
 {instrument_context}
 
@@ -51,6 +51,12 @@ def create_portfolio_manager(llm):
 - **Hold**: Maintain current position, no action needed
 - **Underweight**: Reduce exposure, take partial profits
 - **Sell**: Exit position or avoid entry
+
+**Crypto-specific guidance for your decision fields:**
+- `leverage`: default 1.0 (spot). Only recommend above 1.0 for BTC/ETH with strong conviction; cap at 3.0. Never for altcoins.
+- `stop_loss_pct`: set whenever rating is Buy or Overweight. Typical range 5–15% for majors, 10–20% for alts.
+- `time_horizon`: use windows appropriate for crypto (e.g. "3–7 days", "2–4 weeks", "1–3 months").
+- Express position sizing as % of portfolio (crypto trades in fractional units, not share counts).
 
 **Context:**
 - Research Manager's investment plan: **{research_plan}**

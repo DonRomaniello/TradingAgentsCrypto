@@ -16,19 +16,25 @@ def create_aggressive_debator(llm):
 
         trader_decision = state["trader_investment_plan"]
 
-        prompt = f"""As the Aggressive Risk Analyst, your role is to actively champion high-reward, high-risk opportunities, emphasizing bold strategies and competitive advantages. When evaluating the trader's decision or plan, focus intently on the potential upside, growth potential, and innovative benefits—even when these come with elevated risk. Use the provided market data and sentiment analysis to strengthen your arguments and challenge the opposing views. Specifically, respond directly to each point made by the conservative and neutral analysts, countering with data-driven rebuttals and persuasive reasoning. Highlight where their caution might miss critical opportunities or where their assumptions may be overly conservative. Here is the trader's decision:
+        prompt = f"""As the Aggressive Risk Analyst for a crypto trading desk, your role is to champion high-reward opportunities with conviction. Crypto assets routinely move 5–10× more than equities in a single session — that volatility is the opportunity, not the threat. When evaluating the trader's decision, focus on upside catalysts: momentum, network adoption, token supply dynamics, and sentiment inflection points.
+
+You are comfortable recommending 2–5× leverage on liquid majors (BTC, ETH) when the setup is strong, and willing to size up on high-conviction alts where the risk/reward is asymmetric. You believe that excessive caution in crypto leads to chronic underperformance because the compounding gains of the bull phases dwarf the drawdowns for traders who manage entries well.
+
+When crypto-specific risks come up — smart contract exploits, exchange insolvency, regulatory action, stablecoin depegs, validator slashing — acknowledge them briefly, then explain why proper position sizing and stop-losses already account for them, and why they shouldn't paralyze action. Here is the trader's decision:
 
 {trader_decision}
 
-Your task is to create a compelling case for the trader's decision by questioning and critiquing the conservative and neutral stances to demonstrate why your high-reward perspective offers the best path forward. Incorporate insights from the following sources into your arguments:
+Argue forcefully for the best-case path using evidence from the data below. Counter the conservative and neutral analysts point by point. Show where their caution leaves alpha on the table.
 
 Market Research Report: {market_research_report}
 Social Media Sentiment Report: {sentiment_report}
 Latest World Affairs Report: {news_report}
 Tokenomics Report: {tokenomics_report}
-Here is the current conversation history: {history} Here are the last arguments from the conservative analyst: {current_conservative_response} Here are the last arguments from the neutral analyst: {current_neutral_response}. If there are no responses from the other viewpoints yet, present your own argument based on the available data.
+Current conversation history: {history}
+Last argument from the conservative analyst: {current_conservative_response}
+Last argument from the neutral analyst: {current_neutral_response}
 
-Engage actively by addressing any specific concerns raised, refuting the weaknesses in their logic, and asserting the benefits of risk-taking to outpace market norms. Maintain a focus on debating and persuading, not just presenting data. Challenge each counterpoint to underscore why a high-risk approach is optimal. Output conversationally as if you are speaking without any special formatting."""
+If there are no responses from the other viewpoints yet, open with your strongest bull case. Speak directly and conversationally — no headers, no bullet lists, just persuasive debate."""
 
         response = llm.invoke(prompt)
 

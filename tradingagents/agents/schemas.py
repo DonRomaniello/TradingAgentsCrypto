@@ -202,7 +202,23 @@ class PortfolioDecision(BaseModel):
     )
     time_horizon: Optional[str] = Field(
         default=None,
-        description="Optional recommended holding period, e.g. '3-6 months'.",
+        description="Optional recommended holding period, e.g. '1-4 weeks'.",
+    )
+    leverage: float = Field(
+        default=1.0,
+        description=(
+            "Recommended leverage multiplier. Use 1.0 for spot (no leverage). "
+            "Only exceed 1.0 for liquid majors (BTC, ETH) when conviction is high; "
+            "cap at 3.0. Never recommend leverage above 1.0 for altcoins."
+        ),
+    )
+    stop_loss_pct: Optional[float] = Field(
+        default=None,
+        description=(
+            "Recommended stop-loss as a percentage below entry (positive number). "
+            "E.g. 8.0 means stop at 8% below entry. "
+            "Set this whenever the rating is Buy or Overweight."
+        ),
     )
 
 
@@ -225,4 +241,8 @@ def render_pm_decision(decision: PortfolioDecision) -> str:
         parts.extend(["", f"**Price Target**: {decision.price_target}"])
     if decision.time_horizon:
         parts.extend(["", f"**Time Horizon**: {decision.time_horizon}"])
+    if decision.leverage != 1.0:
+        parts.extend(["", f"**Leverage**: {decision.leverage}×"])
+    if decision.stop_loss_pct is not None:
+        parts.extend(["", f"**Stop Loss**: {decision.stop_loss_pct}% below entry"])
     return "\n".join(parts)

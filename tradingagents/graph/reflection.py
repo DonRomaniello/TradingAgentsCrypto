@@ -45,7 +45,7 @@ class Reflector:
                 "human",
                 (
                     f"Raw return: {raw_return:+.1%}\n"
-                    f"Alpha vs SPY: {alpha_return:+.1%}\n\n"
+                    f"Alpha vs BTC/USDT: {alpha_return:+.1%}\n\n"
                     f"Final Decision:\n{final_decision}"
                 ),
             ),

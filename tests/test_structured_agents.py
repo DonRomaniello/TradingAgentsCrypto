@@ -94,7 +94,7 @@ class TestRenderResearchPlan:
 
 def _make_trader_state():
     return {
-        "instrument": "NVDA",
+        "instrument": "BTC/USDT",
         "investment_plan": "**Recommendation**: Buy\n**Rationale**: ...\n**Strategic Actions**: ...",
     }
 
@@ -167,7 +167,7 @@ class TestTraderAgent:
 
 def _make_rm_state():
     return {
-        "instrument": "NVDA",
+        "instrument": "BTC/USDT",
         "investment_debate_state": {
             "history": "Bull and bear arguments here.",
             "bull_history": "Bull says...",

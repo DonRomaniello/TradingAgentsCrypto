@@ -73,7 +73,7 @@ class TestDeepSeekReasoningContent:
                         "index": 0,
                         "message": {
                             "role": "assistant",
-                            "content": "Plan: buy NVDA.",
+                            "content": "Plan: buy BTC/USDT.",
                             "reasoning_content": "Step 1: trend is up. Step 2: ...",
                         },
                         "finish_reason": "stop",

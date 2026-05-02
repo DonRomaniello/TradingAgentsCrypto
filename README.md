@@ -25,12 +25,12 @@
 
 ---
 
-# TradingAgents: Multi-Agents LLM Financial Trading Framework
+# TradingAgents: Multi-Agents LLM Crypto Trading Framework
 
 ## News
+- [2026-05] **TradingAgentsCrypto v0.3.0** released — full migration from stock trading to crypto-native analysis. Breaking change: all stock data sources (yfinance, Alpha Vantage) removed; replaced with ccxt (market data), CoinGecko (tokenomics), CryptoPanic (news), LunarCrush (social), Coinglass (derivatives), DeFiLlama (DeFi TVL). See [CHANGELOG.md](CHANGELOG.md).
 - [2026-04] **TradingAgents v0.2.4** released with structured-output agents (Research Manager, Trader, Portfolio Manager), LangGraph checkpoint resume, persistent decision log, DeepSeek/Qwen/GLM/Azure provider support, Docker, and a Windows UTF-8 encoding fix. See [CHANGELOG.md](CHANGELOG.md) for the full list.
 - [2026-03] **TradingAgents v0.2.3** released with multi-language support, GPT-5.4 family models, unified model catalog, backtesting date fidelity, and proxy support.
-- [2026-03] **TradingAgents v0.2.2** released with GPT-5.4/Gemini 3.1/Claude 4.6 model coverage, five-tier rating scale, OpenAI Responses API, Anthropic effort control, and cross-platform stability.
 - [2026-02] **TradingAgents v0.2.0** released with multi-provider LLM support (GPT-5.x, Gemini 3.x, Claude 4.x, Grok 4.x) and improved system architecture.
 - [2026-01] **Trading-R1** [Technical Report](https://arxiv.org/abs/2509.11420) released, with [Terminal](https://github.com/TauricResearch/Trading-R1) expected to land soon.
 
@@ -56,7 +56,7 @@
 
 ## TradingAgents Framework
 
-TradingAgents is a multi-agent trading framework that mirrors the dynamics of real-world trading firms. By deploying specialized LLM-powered agents: from fundamental analysts, sentiment experts, and technical analysts, to trader, risk management team, the platform collaboratively evaluates market conditions and informs trading decisions. Moreover, these agents engage in dynamic discussions to pinpoint the optimal strategy.
+TradingAgents is a crypto-native multi-agent trading framework that mirrors the dynamics of real-world trading firms. By deploying specialized LLM-powered agents — from market and tokenomics analysts, sentiment and news experts, derivatives specialists, to trader, risk management team — the platform collaboratively evaluates crypto market conditions and informs trading decisions. Moreover, these agents engage in dynamic discussions to pinpoint the optimal strategy.
 
 <p align="center">
   <img src="assets/schema.png" style="width: 100%; height: auto;">
@@ -67,10 +67,11 @@ TradingAgents is a multi-agent trading framework that mirrors the dynamics of re
 Our framework decomposes complex trading tasks into specialized roles. This ensures the system achieves a robust, scalable approach to market analysis and decision-making.
 
 ### Analyst Team
-- Fundamentals Analyst: Evaluates company financials and performance metrics, identifying intrinsic values and potential red flags.
-- Sentiment Analyst: Analyzes social media and public sentiment using sentiment scoring algorithms to gauge short-term market mood.
-- News Analyst: Monitors global news and macroeconomic indicators, interpreting the impact of events on market conditions.
-- Technical Analyst: Utilizes technical indicators (like MACD and RSI) to detect trading patterns and forecast price movements.
+- **Market Analyst**: Fetches OHLCV data via ccxt (Binance by default) and computes technical indicators (RSI, MACD, Bollinger Bands, ATR, and more) using the `ta` library.
+- **Tokenomics Analyst**: Evaluates token supply dynamics, FDV vs market cap, protocol TVL and revenue via CoinGecko and DeFiLlama.
+- **Social Media Analyst**: Analyzes Twitter/X crypto discussion, Reddit, Discord, and on-chain social signals via LunarCrush.
+- **News Analyst**: Monitors crypto-specific news from CryptoPanic — exchange listings, protocol upgrades, SEC/CFTC actions, macro signals.
+- **Derivatives Analyst**: Tracks funding rates, open interest, long/short ratios, and liquidation data via Coinglass. Flags overleveraged market conditions.
 
 <p align="center">
   <img src="assets/analyst.png" width="100%" style="display: inline-block; margin: 0 2%;">
@@ -145,8 +146,24 @@ export DEEPSEEK_API_KEY=...        # DeepSeek
 export DASHSCOPE_API_KEY=...       # Qwen (Alibaba DashScope)
 export ZHIPU_API_KEY=...           # GLM (Zhipu)
 export OPENROUTER_API_KEY=...      # OpenRouter
-export ALPHA_VANTAGE_API_KEY=...   # Alpha Vantage
 ```
+
+Set the crypto data API keys (all optional — analysts degrade gracefully to "data unavailable" if missing):
+
+```bash
+export CRYPTOPANIC_TOKEN=...       # CryptoPanic news (recommended)
+export LUNARCRUSH_API_KEY=...      # LunarCrush social metrics (recommended)
+export COINGLASS_API_KEY=...       # Coinglass derivatives data (recommended)
+export COINGECKO_API_KEY=...       # CoinGecko (optional; free tier works without key)
+```
+
+| Var | Required? | Used by |
+|---|---|---|
+| LLM provider key (OpenAI / Anthropic / etc.) | **yes** | All agents |
+| `CRYPTOPANIC_TOKEN` | recommended | News analyst |
+| `LUNARCRUSH_API_KEY` | recommended | Social analyst |
+| `COINGLASS_API_KEY` | recommended | Derivatives analyst |
+| `COINGECKO_API_KEY` | optional | Tokenomics analyst (free tier works) |
 
 For enterprise providers (e.g. Azure OpenAI, AWS Bedrock), copy `.env.enterprise.example` to `.env.enterprise` and fill in your credentials.
 
@@ -196,10 +213,12 @@ from tradingagents.default_config import DEFAULT_CONFIG
 
 ta = TradingAgentsGraph(debug=True, config=DEFAULT_CONFIG.copy())
 
-# forward propagate
-_, decision = ta.propagate("NVDA", "2026-01-15")
+# Analyze BTC/USDT on a specific date
+_, decision = ta.propagate("BTC/USDT", "2026-05-02")
 print(decision)
 ```
+
+Supported symbol formats: `BTC/USDT`, `ETH/USDT`, `SOL/USDT`, `binance:BTC/USDT`, etc.
 
 You can also adjust the default configuration to set your own choice of LLMs, debate rounds, etc.
 
@@ -212,9 +231,10 @@ config["llm_provider"] = "openai"        # openai, google, anthropic, xai, deeps
 config["deep_think_llm"] = "gpt-5.4"     # Model for complex reasoning
 config["quick_think_llm"] = "gpt-5.4-mini" # Model for quick tasks
 config["max_debate_rounds"] = 2
+config["selected_analysts"] = ["market", "social", "news", "tokenomics", "derivatives"]
 
 ta = TradingAgentsGraph(debug=True, config=config)
-_, decision = ta.propagate("NVDA", "2026-01-15")
+_, decision = ta.propagate("SOL/USDT", "2026-05-02")
 print(decision)
 ```
 
@@ -226,7 +246,7 @@ TradingAgents persists two kinds of state across runs.
 
 ### Decision log
 
-The decision log is always on. Each completed run appends its decision to `~/.tradingagents/memory/trading_memory.md`. On the next run for the same ticker, TradingAgents fetches the realised return (raw and alpha vs SPY), generates a one-paragraph reflection, and injects the most recent same-ticker decisions plus recent cross-ticker lessons into the Portfolio Manager prompt, so each analysis carries forward what worked and what didn't.
+The decision log is always on. Each completed run appends its decision to `~/.tradingagents/memory/trading_memory.md`. On the next run for the same pair, TradingAgents fetches the realised return (raw and alpha vs BTC/USDT benchmark), generates a one-paragraph reflection, and injects the most recent same-pair decisions plus recent cross-pair lessons into the Portfolio Manager prompt, so each analysis carries forward what worked and what didn't.
 
 Override the path with `TRADINGAGENTS_MEMORY_LOG_PATH`.
 

@@ -6,6 +6,63 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Breaking changes within the 0.x line are called out explicitly.
 
+## [0.3.0] — 2026-05-02
+
+**Breaking change**: Migrated from stock trading to crypto-native trading. All stock-specific
+data sources have been removed and replaced with crypto-focused equivalents. This release is
+not backward-compatible with 0.2.x configurations that used stock symbols.
+
+### Added
+
+- **ccxt market data**: `tradingagents/dataflows/ccxt_market_data.py` — OHLCV data from any
+  ccxt-supported exchange (Binance by default). Disk parquet cache at
+  `~/.tradingagents/cache/ccxt/<venue>/<base>_<quote>_<tf>.parquet`.
+- **CoinGecko tokenomics**: `tradingagents/dataflows/coingecko.py` — market summary and
+  tokenomics data (supply, FDV, market cap) via free-tier CoinGecko API.
+- **CryptoPanic news**: `tradingagents/dataflows/cryptopanic.py` — crypto news aggregator.
+  Requires `CRYPTOPANIC_TOKEN`. Degrades gracefully to "data unavailable" when missing.
+- **LunarCrush social metrics**: `tradingagents/dataflows/lunarcrush.py` — galaxy score,
+  alt rank, social volume, sentiment. Requires `LUNARCRUSH_API_KEY`.
+- **Coinglass derivatives**: `tradingagents/dataflows/coinglass.py` — funding rates, open
+  interest, long/short ratios, liquidations. 5-min TTL cache. Requires `COINGLASS_API_KEY`.
+- **DeFiLlama TVL/revenue**: `tradingagents/dataflows/defillama.py` — protocol TVL and
+  revenue for 20+ DeFi protocols. Free, no auth required.
+- **`ta` library indicators**: `tradingagents/dataflows/indicators.py` — RSI, MACD,
+  Bollinger Bands, ATR, VWMA, EMA, SMA using the `ta` library (replaces pandas_ta).
+- **Instrument NamedTuple**: `tradingagents/dataflows/symbols.py` — `Instrument(base, quote,
+  venue)`, `parse_symbol()`, `format_symbol()` for canonical crypto symbol handling.
+- **Tokenomics Analyst**: new agent replacing Fundamentals Analyst. Analyzes token supply
+  dynamics, FDV vs MCAP, protocol TVL, and revenue signals.
+- **Derivatives Analyst**: new agent. Analyzes funding rates, OI trends, long/short ratios,
+  liquidation cascades. Specific thresholds in prompt (>0.1%/8h = extreme).
+- **Crypto-tuned risk debaters**: Aggressive, Conservative, and Neutral risk analyst prompts
+  rewritten for 5–10× crypto volatility, smart contract exploits, exchange insolvency,
+  regulatory action, stablecoin depegs, and validator slashing.
+- **`leverage` and `stop_loss_pct` fields** in `PortfolioDecision` schema — leverage defaults
+  to 1.0 (spot); stop_loss_pct expressed as percentage below entry.
+
+### Changed
+
+- `selected_analysts` default changed from `["market", "social", "news", "fundamentals"]`
+  to `["market", "social", "news", "tokenomics"]`.
+- Reflection benchmark changed from `SPY` to `BTC/USDT`.
+- `company_of_interest` state key renamed to `instrument` throughout.
+- `fundamentals_report` state key renamed to `tokenomics_report`.
+- Portfolio Manager and Trader prompts updated for crypto sizing (fractional units, % of
+  portfolio instead of share counts).
+
+### Removed (Breaking)
+
+- `yfinance` dependency and all yfinance-based data fetches.
+- `alpha_vantage` dependency and all Alpha Vantage data sources.
+- `backtrader` and `stockstats` dependencies.
+- `pandas_ta` replaced by `ta` (unavailable for Python 3.11).
+- `core_stock_tools.py`, `fundamental_data_tools.py`, `technical_indicators_tools.py`.
+- `y_finance.py`, `yfinance_news.py`, `alpha_vantage*.py`, `stockstats_utils.py`.
+- `fundamentals_analyst.py` replaced by `tokenomics_analyst.py`.
+
+---
+
 ## [0.2.4] — 2026-04-25
 
 ### Added

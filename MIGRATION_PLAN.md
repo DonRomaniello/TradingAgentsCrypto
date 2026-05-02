@@ -11,7 +11,7 @@ Migrate this repo from a stock trading agent system to a crypto trading agent sy
 ## Ground rules for the implementer
 
 1. **Work in the order below.** Each phase ends in a runnable state — don't start phase N+1 until N runs end-to-end.
-2. **Commit per phase** with a message like `phase 2: swap market data to ccxt`. Push after each commit.
+2. **Commit AND push after every single phase**, without exception, before starting the next one. Message format: `phase N: <short summary>`. Push command: `git push -u origin claude/crypto-trading-migration-jFir0`. Do not batch multiple phases into one commit, and do not defer pushing "until the end" — pushing per phase is how drift gets caught early. If a phase is large, you may make intermediate commits within it, but the phase boundary commit is mandatory.
 3. **Don't add backwards-compat shims.** Stocks are gone. Delete code, don't gate it behind flags.
 4. **Don't invent providers.** Use the exact providers named below. If one is unreachable, stop and ask.
 5. **Keep the LangGraph orchestration layer intact** — `graph/setup.py`, `graph/propagation.py`, `graph/reflection.py` structure should not change. Only inputs/outputs change.

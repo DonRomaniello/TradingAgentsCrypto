@@ -38,8 +38,9 @@ DEFAULT_CONFIG = {
     # Output language for analyst reports and final decision
     # Internal agent debate stays in English for reasoning quality
     "output_language": "English",
-    # Debate and discussion settings
-    "max_debate_rounds": 1,
+    # Debate and discussion settings. Two bull/bear rounds give each side one
+    # rebuttal; a single round is two opening statements with no actual debate.
+    "max_debate_rounds": 2,
     "max_risk_discuss_rounds": 1,
     "max_recur_limit": 100,
     # Data vendor configuration

@@ -27,6 +27,20 @@ _RATING_SET = {r.lower() for r in RATINGS_5_TIER}
 _RATING_LABEL_RE = re.compile(r"rating.*?[:\-][\s*]*(\w+)", re.IGNORECASE)
 
 
+def rating_distance(a: Optional[str], b: Optional[str]) -> Optional[int]:
+    """Tier distance between two ratings on the 5-tier scale (0 = identical).
+
+    Returns None when either rating is missing or not on the scale, so
+    callers can distinguish "consistent" from "unverifiable".
+    """
+    try:
+        return abs(
+            RATINGS_5_TIER.index(a.capitalize()) - RATINGS_5_TIER.index(b.capitalize())
+        )
+    except (ValueError, AttributeError):
+        return None
+
+
 def parse_rating(text: str, default: Optional[str] = None) -> Optional[str]:
     """Heuristically extract a 5-tier rating from prose text.
 

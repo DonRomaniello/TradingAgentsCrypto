@@ -36,7 +36,10 @@ from tradingagents.agents.utils.agent_utils import (
     get_income_statement,
     get_news,
     get_insider_transactions,
-    get_global_news
+    get_global_news,
+    get_funding_rates,
+    get_open_interest,
+    get_fear_greed_index,
 )
 
 from .checkpointer import checkpoint_step, clear_checkpoint, get_checkpointer, thread_id
@@ -161,12 +164,17 @@ class TradingAgentsGraph:
                     get_stock_data,
                     # Technical indicators
                     get_indicators,
+                    # Crypto derivatives positioning (no-ops for equities)
+                    get_funding_rates,
+                    get_open_interest,
                 ]
             ),
             "social": ToolNode(
                 [
                     # News tools for social media analysis
                     get_news,
+                    # Crypto crowd sentiment
+                    get_fear_greed_index,
                 ]
             ),
             "news": ToolNode(
@@ -379,6 +387,8 @@ class TradingAgentsGraph:
         # Store current state for reflection.
         self.curr_state = final_state
 
+        self._check_rating_consistency(final_state)
+
         # Log state to disk.
         self._log_state(trade_date, final_state)
 
@@ -396,6 +406,27 @@ class TradingAgentsGraph:
             )
 
         return final_state, self.process_signal(final_state["final_trade_decision"])
+
+    def _check_rating_consistency(self, final_state) -> None:
+        """Flag large rating swings along the Research Manager -> PM chain.
+
+        Three agents emit ratings in sequence with nothing structurally
+        forcing agreement. A 2+ tier jump (e.g. research says Sell, PM says
+        Buy) usually means one stage ignored its inputs — surface it instead
+        of letting it pass silently into the final signal.
+        """
+        from tradingagents.agents.utils.rating import parse_rating, rating_distance
+
+        research = parse_rating(final_state.get("investment_plan", ""))
+        final = parse_rating(final_state.get("final_trade_decision", ""))
+        dist = rating_distance(research, final)
+        if dist is not None and dist >= 2:
+            logger.warning(
+                "Rating divergence for %s: Research Manager said %s but the "
+                "Portfolio Manager decided %s (%d tiers apart). Review the "
+                "risk debate before acting on this signal.",
+                self.ticker, research, final, dist,
+            )
 
     def _log_state(self, trade_date, final_state):
         """Log the final state to a JSON file."""

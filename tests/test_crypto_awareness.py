@@ -117,3 +117,105 @@ class TestWindowReturn:
         assert TradingAgentsGraph._window_return(
             hist, datetime(2026, 6, 5), datetime(2026, 6, 10)
         ) is None
+
+
+@pytest.mark.unit
+class TestCryptoDataTools:
+    def test_binance_perp_symbol_mapping(self):
+        from tradingagents.dataflows.crypto_utils import binance_perp_symbol
+        assert binance_perp_symbol("BTC-USD") == "BTCUSDT"
+        assert binance_perp_symbol("eth-usdt") == "ETHUSDT"
+        assert binance_perp_symbol("SOL-USDC") == "SOLUSDT"
+        assert binance_perp_symbol("ETH-BTC") is None
+        assert binance_perp_symbol("AAPL") is None
+
+    def test_derivatives_tools_reject_equities(self):
+        from tradingagents.agents.utils.crypto_data_tools import (
+            get_funding_rates, get_open_interest,
+        )
+        out = get_funding_rates.invoke({"ticker": "AAPL", "curr_date": "2026-06-01"})
+        assert "not a crypto pair" in out
+        out = get_open_interest.invoke({"ticker": "AAPL", "curr_date": "2026-06-01"})
+        assert "not a crypto pair" in out
+
+    def test_funding_rates_formats_response(self, monkeypatch):
+        from tradingagents.dataflows import crypto_utils
+
+        class _Resp:
+            def raise_for_status(self):
+                pass
+            def json(self):
+                return [
+                    {"fundingRate": "0.0001", "fundingTime": 1},
+                    {"fundingRate": "0.0003", "fundingTime": 2},
+                ]
+
+        monkeypatch.setattr(crypto_utils.requests, "get", lambda *a, **k: _Resp())
+        out = crypto_utils.get_funding_rates("BTC-USD", "2026-06-01")
+        assert "BTCUSDT" in out
+        assert "+0.0300%" in out  # latest rate 0.0003
+        assert "annualised" in out
+
+    def test_fear_greed_filters_future_values(self, monkeypatch):
+        from tradingagents.dataflows import crypto_utils
+
+        class _Resp:
+            def raise_for_status(self):
+                pass
+            def json(self):
+                # One value inside the window, one in the future (look-ahead).
+                return {"data": [
+                    {"timestamp": "1748736000", "value": "20", "value_classification": "Extreme Fear"},  # 2025-06-01
+                    {"timestamp": "1780272000", "value": "90", "value_classification": "Extreme Greed"},  # 2026-06-01
+                ]}
+
+        monkeypatch.setattr(crypto_utils.requests, "get", lambda *a, **k: _Resp())
+        out = crypto_utils.get_fear_greed_index("2025-06-05", look_back_days=14)
+        assert "20" in out and "Extreme Fear" in out
+        assert "90" not in out  # future value must not leak into a historical run
+
+    def test_api_failure_degrades_gracefully(self, monkeypatch):
+        from tradingagents.dataflows import crypto_utils
+
+        def _boom(*a, **k):
+            raise OSError("network down")
+
+        monkeypatch.setattr(crypto_utils.requests, "get", _boom)
+        assert "No funding rate data" in crypto_utils.get_funding_rates("BTC-USD", "2026-06-01")
+        assert "unavailable" in crypto_utils.get_open_interest("BTC-USD", "2026-06-01")
+        assert "unavailable" in crypto_utils.get_fear_greed_index("2026-06-01")
+
+
+@pytest.mark.unit
+class TestRatingDistance:
+    def test_distance_and_consistency(self):
+        from tradingagents.agents.utils.rating import rating_distance
+        assert rating_distance("Buy", "Buy") == 0
+        assert rating_distance("Buy", "Hold") == 2
+        assert rating_distance("Sell", "Buy") == 4
+        assert rating_distance("Buy", None) is None
+        assert rating_distance("Buy", "Strong Buy") is None
+
+    def test_divergence_warning_logged(self, caplog):
+        import logging
+        from tradingagents.graph.trading_graph import TradingAgentsGraph
+        stub = SimpleNamespace(ticker="BTC-USD")
+        state = {
+            "investment_plan": "Rating: Sell\nThesis broken.",
+            "final_trade_decision": "**Rating**: Buy\nAggressive entry.",
+        }
+        with caplog.at_level(logging.WARNING):
+            TradingAgentsGraph._check_rating_consistency(stub, state)
+        assert any("Rating divergence" in r.message for r in caplog.records)
+
+    def test_no_warning_when_adjacent(self, caplog):
+        import logging
+        from tradingagents.graph.trading_graph import TradingAgentsGraph
+        stub = SimpleNamespace(ticker="BTC-USD")
+        state = {
+            "investment_plan": "Rating: Buy",
+            "final_trade_decision": "**Rating**: Overweight",
+        }
+        with caplog.at_level(logging.WARNING):
+            TradingAgentsGraph._check_rating_consistency(stub, state)
+        assert not any("Rating divergence" in r.message for r in caplog.records)

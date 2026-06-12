@@ -8,7 +8,28 @@ Breaking changes within the 0.x line are called out explicitly.
 
 ## [Unreleased]
 
+### Added
+
+- **Crypto-native data tools** (free, key-less public APIs): perpetual-futures
+  funding rates and open interest (Binance, with OKX fallback for geo-blocked
+  regions) for the market analyst, and the crypto Fear & Greed index for the
+  sentiment analyst. All three are date-bounded so historical runs see only
+  data available at the trade date.
+- **Rating-chain consistency check.** The Research Manager's and Portfolio
+  Manager's ratings are compared after each run; a 2+ tier divergence logs a
+  warning, and the PM prompt now requires explicit justification for
+  overriding the research recommendation.
+
 ### Changed
+
+- **Memory lessons reach the whole decision chain.** Past decisions and
+  realised outcomes are now injected into the Research Manager and Trader
+  prompts, not just the Portfolio Manager.
+- **Real debate by default.** `max_debate_rounds` default raised from 1 to 2
+  so bull and bear each get a rebuttal instead of two opening statements.
+- **Analysts no longer emit trade calls.** The vestigial 3-tier
+  "FINAL TRANSACTION PROPOSAL" instruction was removed from analyst prompts;
+  analysts deliver evidence reports, the decision chain decides.
 
 - **Crypto-aware pipeline.** Crypto pairs (e.g. `BTC-USD`) are now detected
   and handled as a distinct asset class: financial-statement and

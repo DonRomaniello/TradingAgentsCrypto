@@ -19,9 +19,16 @@ def create_research_manager(llm):
 
         investment_debate_state = state["investment_debate_state"]
 
+        past_context = state.get("past_context", "")
+        lessons_block = (
+            f"\n\n**Lessons from prior decisions and realised outcomes** (weigh these against the debate):\n{past_context}"
+            if past_context
+            else ""
+        )
+
         prompt = f"""As the Research Manager and debate facilitator, your role is to critically evaluate this round of debate and deliver a clear, actionable investment plan for the trader.
 
-{instrument_context}
+{instrument_context}{lessons_block}
 
 ---
 

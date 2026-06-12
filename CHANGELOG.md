@@ -10,6 +10,15 @@ Breaking changes within the 0.x line are called out explicitly.
 
 ### Added
 
+- **Backtesting harness** (`tradingagents/backtest/`, `scripts/run_backtest.py`).
+  Runs the full pipeline over historical dates, maps ratings to long-only
+  exposure, and simulates the equity curve with trading costs. Reports total
+  return, Sharpe, max drawdown, and directional hit rate vs buy-and-hold
+  (markdown + JSON). Decisions persist to JSONL so interrupted runs resume
+  without re-paying for completed dates; every report carries explicit
+  data-integrity caveats (news/fundamentals are not point-in-time; LLM may
+  have post-hoc knowledge of the period).
+
 - **Crypto-native data tools** (free, key-less public APIs): perpetual-futures
   funding rates and open interest (Binance, with OKX fallback for geo-blocked
   regions) for the market analyst, and the crypto Fear & Greed index for the

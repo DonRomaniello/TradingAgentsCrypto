@@ -1,8 +1,11 @@
 """Append-only markdown decision log for TradingAgents."""
 
+import logging
 from typing import List, Optional
 from pathlib import Path
 import re
+
+logger = logging.getLogger(__name__)
 
 from tradingagents.agents.utils.rating import parse_rating
 
@@ -44,6 +47,13 @@ class TradingMemoryLog:
                 if line.startswith(f"[{trade_date} | {ticker} |") and line.endswith("| pending]"):
                     return
         rating = parse_rating(final_trade_decision)
+        if rating is None:
+            # The tag needs a value, but flag the anomaly rather than masking it.
+            logger.warning(
+                "No rating found in decision for %s on %s; tagging entry as Unrated",
+                ticker, trade_date,
+            )
+            rating = "Unrated"
         tag = f"[{trade_date} | {ticker} | {rating} | pending]"
         entry = f"{tag}\n\nDECISION:\n{final_trade_decision}{self._SEPARATOR}"
         with open(self._log_path, "a", encoding="utf-8") as f:
@@ -120,7 +130,7 @@ class TradingMemoryLog:
 
         pending_prefix = f"[{trade_date} | {ticker} |"
         raw_pct = f"{raw_return:+.1%}"
-        alpha_pct = f"{alpha_return:+.1%}"
+        alpha_pct = f"{alpha_return:+.1%}" if alpha_return is not None else "n/a"
 
         updated = False
         new_blocks = []
@@ -194,7 +204,8 @@ class TradingMemoryLog:
                     fields = [f.strip() for f in tag_line[1:-1].split("|")]
                     rating = fields[2]
                     raw_pct = f"{upd['raw_return']:+.1%}"
-                    alpha_pct = f"{upd['alpha_return']:+.1%}"
+                    alpha = upd["alpha_return"]
+                    alpha_pct = f"{alpha:+.1%}" if alpha is not None else "n/a"
                     new_tag = (
                         f"[{trade_date} | {ticker} | {rating}"
                         f" | {raw_pct} | {alpha_pct} | {upd['holding_days']}d]"

@@ -6,6 +6,66 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Breaking changes within the 0.x line are called out explicitly.
 
+## [Unreleased]
+
+### Added
+
+- **Blind technical backtest mode** (`--blind`). The LLM rates an anonymized
+  asset: relative day labels instead of dates, closes rebased to 100, volume
+  rebased to mean 100, no ticker anywhere in the prompt. Memorization-
+  resistant even on pre-cutoff dates, and one LLM call per decision. News /
+  fundamentals / sentiment are excluded by design (they would de-anonymize
+  the asset).
+- **Backtesting harness** (`tradingagents/backtest/`, `scripts/run_backtest.py`).
+  Runs the full pipeline over historical dates, maps ratings to long-only
+  exposure, and simulates the equity curve with trading costs. Reports total
+  return, Sharpe, max drawdown, and directional hit rate vs buy-and-hold
+  (markdown + JSON). Decisions persist to JSONL so interrupted runs resume
+  without re-paying for completed dates; every report carries explicit
+  data-integrity caveats (news/fundamentals are not point-in-time; LLM may
+  have post-hoc knowledge of the period).
+
+- **Crypto-native data tools** (free, key-less public APIs): perpetual-futures
+  funding rates and open interest (Binance, with OKX fallback for geo-blocked
+  regions) for the market analyst, and the crypto Fear & Greed index for the
+  sentiment analyst. All three are date-bounded so historical runs see only
+  data available at the trade date.
+- **Rating-chain consistency check.** The Research Manager's and Portfolio
+  Manager's ratings are compared after each run; a 2+ tier divergence logs a
+  warning, and the PM prompt now requires explicit justification for
+  overriding the research recommendation.
+
+### Changed
+
+- **Memory lessons reach the whole decision chain.** Past decisions and
+  realised outcomes are now injected into the Research Manager and Trader
+  prompts, not just the Portfolio Manager.
+- **Real debate by default.** `max_debate_rounds` default raised from 1 to 2
+  so bull and bear each get a rebuttal instead of two opening statements.
+- **Analysts no longer emit trade calls.** The vestigial 3-tier
+  "FINAL TRANSACTION PROPOSAL" instruction was removed from analyst prompts;
+  analysts deliver evidence reports, the decision chain decides.
+
+- **Crypto-aware pipeline.** Crypto pairs (e.g. `BTC-USD`) are now detected
+  and handled as a distinct asset class: financial-statement and
+  insider-transaction tools return explicit "not applicable" messages instead
+  of empty data the analysts would confabulate over; the fundamentals analyst
+  switches to an asset-profile prompt; and agent instrument context describes
+  a 24/7 market instead of equity framing.
+- **Return attribution fixed and benchmark made instrument-aware.** Memory-log
+  outcomes are now measured over a calendar-day window aligned by date on both
+  legs (previously raw and benchmark returns were aligned by row index, so
+  24/7 crypto and 5-day equity calendars covered different real-world
+  windows). Crypto pairs benchmark against BTC-USD, equities against SPY;
+  `benchmark_ticker` overrides, and self-benchmarking is suppressed. New
+  `memory_holding_days` config controls the window (default 5).
+- **Rating parse failures are loud.** `SignalProcessor.process_signal` raises
+  `ValueError` instead of silently returning "Hold" when no rating can be
+  extracted; memory-log entries with unparseable decisions are tagged
+  `Unrated` with a warning.
+- **Look-ahead guard for undated news.** In historical runs, yfinance articles
+  without a publish date are excluded instead of leaking into the window.
+
 ## [0.2.4] — 2026-04-25
 
 ### Added

@@ -226,7 +226,7 @@ TradingAgents persists two kinds of state across runs.
 
 ### Decision log
 
-The decision log is always on. Each completed run appends its decision to `~/.tradingagents/memory/trading_memory.md`. On the next run for the same ticker, TradingAgents fetches the realised return (raw and alpha vs SPY), generates a one-paragraph reflection, and injects the most recent same-ticker decisions plus recent cross-ticker lessons into the Portfolio Manager prompt, so each analysis carries forward what worked and what didn't.
+The decision log is always on. Each completed run appends its decision to `~/.tradingagents/memory/trading_memory.md`. On the next run for the same ticker, TradingAgents fetches the realised return (raw, plus alpha against an instrument-appropriate benchmark — BTC-USD for crypto pairs, SPY for equities, overridable via `benchmark_ticker`), generates a one-paragraph reflection, and injects the most recent same-ticker decisions plus recent cross-ticker lessons into the Research Manager, Trader, and Portfolio Manager prompts, so each analysis carries forward what worked and what didn't. Returns are measured over `memory_holding_days` calendar days (default 5), aligned by date on both legs so 24/7 crypto and 5-day equity calendars compare the same real-world window.
 
 Override the path with `TRADINGAGENTS_MEMORY_LOG_PATH`.
 
@@ -247,6 +247,28 @@ config["checkpoint_enabled"] = True
 ta = TradingAgentsGraph(config=config)
 _, decision = ta.propagate("NVDA", "2026-01-15")
 ```
+
+## Backtesting
+
+`scripts/run_backtest.py` runs the full agent pipeline over a historical date range, maps each 5-tier rating to a long-only exposure (Buy 1.0 / Overweight 0.75 / Hold keeps the previous exposure / Underweight 0.25 / Sell 0.0), and simulates the equity curve against daily closes with trading costs:
+
+```bash
+python scripts/run_backtest.py BTC-USD 2026-03-01 2026-06-01 --every 7 --cost-bps 10
+```
+
+The report (markdown + JSON) compares the strategy against buy-and-hold on total return, Sharpe, and max drawdown, and shows the per-decision directional hit rate. Decisions are persisted to a JSONL file as they complete, so an interrupted backtest resumes without re-running finished dates. Every decision date is a full multi-agent run, so start with short ranges.
+
+Two honesty caveats, also printed in every report: news and fundamentals are not point-in-time for historical dates (prices, indicators, funding rates, and the Fear & Greed index are), and the LLM may have post-hoc knowledge of the period — results on dates before the model's knowledge cutoff are optimistic at best.
+
+### Blind technical mode
+
+`--blind` addresses the memorization problem directly: the LLM never sees the ticker, calendar dates, or absolute price levels. It gets a technical snapshot with bars labelled by relative day (day -179 … day 0), closes rebased to 100 at the window start, and volume rebased to a mean of 100 — pure chart shape, nothing to recall the asset or period by.
+
+```bash
+python scripts/run_backtest.py BTC-USD 2024-01-01 2025-01-01 --blind --every 7
+```
+
+Blind mode is one LLM call per decision (cheap — a year of weekly decisions costs ~52 calls instead of ~52 full pipeline runs) and produces memorization-resistant results even on dates well before the model's knowledge cutoff. The trade-off is explicit: news, fundamentals, funding, and sentiment are excluded, because any of them would de-anonymize the asset. Use blind mode to measure whether the model's technical judgment adds value; use the full pipeline forward (paper-trading from today) to measure the whole system.
 
 ## Contributing
 

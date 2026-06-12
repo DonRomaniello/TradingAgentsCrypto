@@ -1,6 +1,7 @@
 from langchain_core.tools import tool
 from typing import Annotated
 from tradingagents.dataflows.interface import route_to_vendor
+from tradingagents.dataflows.utils import is_crypto_pair
 
 @tool
 def get_news(
@@ -50,4 +51,9 @@ def get_insider_transactions(
     Returns:
         str: A report of insider transaction data
     """
+    if is_crypto_pair(ticker):
+        return (
+            f"Insider transactions are not applicable: {ticker} is a crypto "
+            "asset with no corporate insiders. Skip this signal."
+        )
     return route_to_vendor("get_insider_transactions", ticker)

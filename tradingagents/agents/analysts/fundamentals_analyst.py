@@ -9,26 +9,35 @@ from tradingagents.agents.utils.agent_utils import (
     get_language_instruction,
 )
 from tradingagents.dataflows.config import get_config
+from tradingagents.dataflows.utils import is_crypto_pair
 
 
 def create_fundamentals_analyst(llm):
     def fundamentals_analyst_node(state):
         current_date = state["trade_date"]
-        instrument_context = build_instrument_context(state["company_of_interest"])
+        ticker = state["company_of_interest"]
+        instrument_context = build_instrument_context(ticker)
 
-        tools = [
-            get_fundamentals,
-            get_balance_sheet,
-            get_cashflow,
-            get_income_statement,
-        ]
-
-        system_message = (
-            "You are a researcher tasked with analyzing fundamental information over the past week about a company. Please write a comprehensive report of the company's fundamental information such as financial documents, company profile, basic company financials, and company financial history to gain a full view of the company's fundamental information to inform traders. Make sure to include as much detail as possible. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
-            + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
-            + " Use the available tools: `get_fundamentals` for comprehensive company analysis, `get_balance_sheet`, `get_cashflow`, and `get_income_statement` for specific financial statements."
-            + get_language_instruction(),
-        )
+        if is_crypto_pair(ticker):
+            tools = [get_fundamentals]
+            system_message = (
+                "You are a researcher tasked with analyzing the fundamental profile of a crypto asset. There are no financial statements; instead, assess what `get_fundamentals` returns (market cap, circulating/total supply, trading volume, ranges) plus what you know about the asset's supply schedule, token economics, network usage, and adoption. Be explicit about which figures come from the tool versus general knowledge, flag stale general knowledge, and never invent statement-style figures (revenue, earnings, cash flow do not exist here). Provide specific, actionable insights to inform traders."
+                + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
+                + get_language_instruction(),
+            )
+        else:
+            tools = [
+                get_fundamentals,
+                get_balance_sheet,
+                get_cashflow,
+                get_income_statement,
+            ]
+            system_message = (
+                "You are a researcher tasked with analyzing fundamental information over the past week about a company. Please write a comprehensive report of the company's fundamental information such as financial documents, company profile, basic company financials, and company financial history to gain a full view of the company's fundamental information to inform traders. Make sure to include as much detail as possible. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
+                + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
+                + " Use the available tools: `get_fundamentals` for comprehensive company analysis, `get_balance_sheet`, `get_cashflow`, and `get_income_statement` for specific financial statements."
+                + get_language_instruction(),
+            )
 
         prompt = ChatPromptTemplate.from_messages(
             [

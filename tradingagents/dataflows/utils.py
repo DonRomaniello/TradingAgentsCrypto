@@ -41,6 +41,25 @@ def safe_ticker_component(value: str, *, max_len: int = 32) -> str:
     return value
 
 
+# Quote currencies yfinance uses for crypto pairs (e.g. BTC-USD, ETH-EUR,
+# SOL-USDT). A dash-separated quote suffix is how yfinance distinguishes
+# crypto from equities, which never contain a dash before these codes.
+_CRYPTO_QUOTE_SUFFIXES = (
+    "-USD", "-USDT", "-USDC", "-EUR", "-GBP", "-JPY", "-KRW", "-BTC", "-ETH",
+)
+
+
+def is_crypto_pair(ticker: str) -> bool:
+    """Return True when ``ticker`` is a crypto pair (yfinance style, e.g. BTC-USD).
+
+    Used to gate equity-only data tools (financial statements, insider
+    transactions) and to pick an appropriate benchmark for return attribution.
+    """
+    if not isinstance(ticker, str):
+        return False
+    return ticker.upper().endswith(_CRYPTO_QUOTE_SUFFIXES)
+
+
 def save_output(data: pd.DataFrame, tag: str, save_path: SavePathType = None) -> None:
     if save_path:
         data.to_csv(save_path, encoding="utf-8")

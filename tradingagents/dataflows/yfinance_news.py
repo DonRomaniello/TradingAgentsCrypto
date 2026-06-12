@@ -1,7 +1,7 @@
 """yfinance-based news data fetching functions."""
 
 import yfinance as yf
-from datetime import datetime
+from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
 
 from .stockstats_utils import yf_retry
@@ -78,14 +78,20 @@ def get_news_yfinance(
         news_str = ""
         filtered_count = 0
 
+        # In a historical run (end date before today), an undated article may
+        # have been published after the window — including it is look-ahead
+        # bias. In a live run undated articles are current, so keep them.
+        is_historical = end_dt.date() < date.today()
+
         for article in news:
             data = _extract_article_data(article)
 
-            # Filter by date if publish time is available
             if data["pub_date"]:
                 pub_date_naive = data["pub_date"].replace(tzinfo=None)
                 if not (start_dt <= pub_date_naive <= end_dt + relativedelta(days=1)):
                     continue
+            elif is_historical:
+                continue
 
             news_str += f"### {data['title']} (source: {data['publisher']})\n"
             if data["summary"]:

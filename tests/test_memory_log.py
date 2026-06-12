@@ -53,9 +53,23 @@ def _resolve_entry(log, ticker, date, decision, reflection="Good call."):
     log.update_with_outcome(ticker, date, 0.05, 0.02, 5, reflection)
 
 
-def _price_df(prices):
-    """Minimal DataFrame matching yfinance .history() output shape."""
-    return pd.DataFrame({"Close": prices})
+def _price_df(prices, start="2026-01-05"):
+    """Minimal DataFrame matching yfinance .history() output shape.
+
+    Date-indexed (consecutive calendar days from ``start``) because
+    _fetch_returns aligns windows by calendar date, not row count.
+    """
+    idx = pd.date_range(start=start, periods=len(prices), freq="D")
+    return pd.DataFrame({"Close": prices}, index=idx)
+
+
+def _bind_return_helpers(mock_graph):
+    """Give a spec'd mock the real return-window helpers and an empty config."""
+    mock_graph.config = {}
+    mock_graph._window_return = TradingAgentsGraph._window_return
+    mock_graph._benchmark_ticker = (
+        lambda t: TradingAgentsGraph._benchmark_ticker(mock_graph, t)
+    )
 
 
 def _make_pm_state(past_context=""):
@@ -170,10 +184,11 @@ class TestTradingMemoryLogCore:
         log.store_decision("AAPL", "2026-01-11", DECISION_OVERWEIGHT)
         assert log.load_entries()[0]["rating"] == "Overweight"
 
-    def test_rating_fallback_hold(self, tmp_path):
+    def test_rating_fallback_unrated(self, tmp_path):
+        # A decision with no parseable rating is flagged, not masked as Hold.
         log = make_log(tmp_path)
         log.store_decision("MSFT", "2026-01-12", DECISION_NO_RATING)
-        assert log.load_entries()[0]["rating"] == "Hold"
+        assert log.load_entries()[0]["rating"] == "Unrated"
 
     def test_rating_priority_over_prose(self, tmp_path):
         """'Rating: X' label wins even when an opposing rating word appears earlier in prose."""
@@ -475,7 +490,10 @@ class TestDeferredReflection:
         mock_llm.invoke.return_value.content = "Incorrect call."
         reflector = Reflector(mock_llm)
         reflector.reflect_on_final_decision(
-            final_decision=DECISION_SELL, raw_return=-0.08, alpha_return=-0.05
+            final_decision=DECISION_SELL,
+            raw_return=-0.08,
+            alpha_return=-0.05,
+            benchmark="SPY",
         )
         messages = mock_llm.invoke.call_args[0][0]
         human_content = next(content for role, content in messages if role == "human")
@@ -489,6 +507,7 @@ class TestDeferredReflection:
         stock_prices = [100.0, 102.0, 104.0, 103.0, 105.0, 106.0]
         spy_prices   = [400.0, 402.0, 404.0, 403.0, 405.0, 406.0]
         mock_graph = MagicMock(spec=TradingAgentsGraph)
+        _bind_return_helpers(mock_graph)
         with patch("yfinance.Ticker") as mock_ticker_cls:
             def _make_ticker(sym):
                 m = MagicMock()
@@ -503,9 +522,10 @@ class TestDeferredReflection:
     def test_fetch_returns_too_recent(self):
         """Only 1 data point available → returns (None, None, None), no crash."""
         mock_graph = MagicMock(spec=TradingAgentsGraph)
+        _bind_return_helpers(mock_graph)
         with patch("yfinance.Ticker") as mock_ticker_cls:
             m = MagicMock()
-            m.history.return_value = _price_df([100.0])
+            m.history.return_value = _price_df([100.0], start="2026-04-19")
             mock_ticker_cls.return_value = m
             raw, alpha, days = TradingAgentsGraph._fetch_returns(mock_graph, "NVDA", "2026-04-19")
         assert raw is None and alpha is None and days is None
@@ -513,6 +533,7 @@ class TestDeferredReflection:
     def test_fetch_returns_delisted(self):
         """Empty DataFrame → returns (None, None, None), no crash."""
         mock_graph = MagicMock(spec=TradingAgentsGraph)
+        _bind_return_helpers(mock_graph)
         with patch("yfinance.Ticker") as mock_ticker_cls:
             m = MagicMock()
             m.history.return_value = pd.DataFrame({"Close": []})
@@ -521,10 +542,12 @@ class TestDeferredReflection:
         assert raw is None and alpha is None and days is None
 
     def test_fetch_returns_spy_shorter_than_stock(self):
-        """SPY having fewer rows than the stock must not raise IndexError."""
+        """SPY having fewer bars than the stock must not raise or truncate
+        the instrument's own calendar window."""
         stock_prices = [100.0, 102.0, 104.0, 103.0, 105.0, 106.0]
         spy_prices   = [400.0, 402.0, 403.0]
         mock_graph = MagicMock(spec=TradingAgentsGraph)
+        _bind_return_helpers(mock_graph)
         with patch("yfinance.Ticker") as mock_ticker_cls:
             def _make_ticker(sym):
                 m = MagicMock()
@@ -533,7 +556,9 @@ class TestDeferredReflection:
             mock_ticker_cls.side_effect = _make_ticker
             raw, alpha, days = TradingAgentsGraph._fetch_returns(mock_graph, "NVDA", "2026-01-05")
         assert raw is not None and alpha is not None and days is not None
-        assert days == 2
+        # Raw return spans the full 5-calendar-day window regardless of how
+        # many benchmark bars exist inside it.
+        assert days == 5
 
     # TradingAgentsGraph._resolve_pending_entries
 
@@ -555,6 +580,8 @@ class TestDeferredReflection:
         mock_reflector = MagicMock()
         mock_reflector.reflect_on_final_decision.return_value = "Momentum confirmed."
         mock_graph = MagicMock(spec=TradingAgentsGraph)
+        mock_graph.config = {}
+        mock_graph._benchmark_ticker = MagicMock(return_value="SPY")
         mock_graph.memory_log = log
         mock_graph.reflector = mock_reflector
         mock_graph._fetch_returns = MagicMock(return_value=(0.05, 0.02, 5))

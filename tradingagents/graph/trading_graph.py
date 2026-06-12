@@ -18,7 +18,7 @@ from tradingagents.llm_clients import create_llm_client
 from tradingagents.agents import *
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.agents.utils.memory import TradingMemoryLog
-from tradingagents.dataflows.utils import safe_ticker_component
+from tradingagents.dataflows.utils import safe_ticker_component, is_crypto_pair
 from tradingagents.agents.utils.agent_states import (
     AgentState,
     InvestDebateState,
@@ -188,36 +188,81 @@ class TradingAgentsGraph:
             ),
         }
 
+    def _benchmark_ticker(self, ticker: str) -> Optional[str]:
+        """Pick the benchmark for return attribution.
+
+        Crypto pairs are benchmarked against BTC-USD (the market beta of the
+        asset class), equities against SPY. ``benchmark_ticker`` in config
+        overrides both. Returns None when the instrument *is* the benchmark —
+        alpha against itself is always zero and would only mislead the
+        reflection step.
+        """
+        benchmark = self.config.get("benchmark_ticker") or (
+            "BTC-USD" if is_crypto_pair(ticker) else "SPY"
+        )
+        return None if benchmark.upper() == ticker.upper() else benchmark
+
+    @staticmethod
+    def _window_return(
+        history, start: datetime, target: datetime
+    ) -> Optional[Tuple[float, datetime, datetime]]:
+        """Close-to-close return over the calendar window [start, target].
+
+        Uses the first bar at/after ``start`` as entry and the last bar
+        at/before ``target`` as exit, so instruments with different trading
+        calendars (24/7 crypto vs 5-day equities) are compared over the same
+        real-world window rather than the same number of rows.
+        """
+        if history is None or history.empty:
+            return None
+        idx = history.index.tz_localize(None) if history.index.tz else history.index
+        entry_mask = idx >= start
+        exit_mask = idx <= target
+        if not entry_mask.any() or not exit_mask.any():
+            return None
+        entry_pos = entry_mask.argmax()
+        exit_pos = len(idx) - 1 - exit_mask[::-1].argmax()
+        if exit_pos <= entry_pos:
+            return None
+        entry_close = float(history["Close"].iloc[entry_pos])
+        exit_close = float(history["Close"].iloc[exit_pos])
+        return (exit_close - entry_close) / entry_close, idx[entry_pos], idx[exit_pos]
+
     def _fetch_returns(
         self, ticker: str, trade_date: str, holding_days: int = 5
     ) -> Tuple[Optional[float], Optional[float], Optional[int]]:
-        """Fetch raw and alpha return for ticker over holding_days from trade_date.
+        """Fetch raw and benchmark-relative return over a calendar window.
 
-        Returns (raw_return, alpha_return, actual_holding_days) or
-        (None, None, None) if price data is unavailable (too recent, delisted,
-        or network error).
+        ``holding_days`` is calendar days from trade_date; both the instrument
+        and the benchmark are measured over that same calendar window (aligned
+        by date, not row count, so 24/7 crypto and 5-day equity calendars
+        don't drift apart). Returns (raw_return, alpha_return,
+        actual_holding_days); alpha_return is None when no distinct benchmark
+        applies; everything is None when price data is unavailable (too
+        recent, delisted, or network error).
         """
         try:
             start = datetime.strptime(trade_date, "%Y-%m-%d")
-            end = start + timedelta(days=holding_days + 7)  # buffer for weekends/holidays
-            end_str = end.strftime("%Y-%m-%d")
+            target = start + timedelta(days=holding_days)
+            # Fetch past the target so the exit bar exists even when the
+            # target lands on an equity-market holiday or weekend.
+            end_str = (target + timedelta(days=7)).strftime("%Y-%m-%d")
 
             stock = yf.Ticker(ticker).history(start=trade_date, end=end_str)
-            spy = yf.Ticker("SPY").history(start=trade_date, end=end_str)
-
-            if len(stock) < 2 or len(spy) < 2:
+            stock_ret = self._window_return(stock, start, target)
+            if stock_ret is None:
                 return None, None, None
+            raw, entry_date, exit_date = stock_ret
+            actual_days = (exit_date - entry_date).days
 
-            actual_days = min(holding_days, len(stock) - 1, len(spy) - 1)
-            raw = float(
-                (stock["Close"].iloc[actual_days] - stock["Close"].iloc[0])
-                / stock["Close"].iloc[0]
-            )
-            spy_ret = float(
-                (spy["Close"].iloc[actual_days] - spy["Close"].iloc[0])
-                / spy["Close"].iloc[0]
-            )
-            alpha = raw - spy_ret
+            alpha = None
+            benchmark = self._benchmark_ticker(ticker)
+            if benchmark:
+                bench = yf.Ticker(benchmark).history(start=trade_date, end=end_str)
+                bench_ret = self._window_return(bench, start, target)
+                if bench_ret is not None:
+                    alpha = raw - bench_ret[0]
+
             return raw, alpha, actual_days
         except Exception as e:
             logger.warning(
@@ -241,14 +286,19 @@ class TradingAgentsGraph:
             return
 
         updates = []
+        holding_days = self.config.get("memory_holding_days", 5)
+        benchmark = self._benchmark_ticker(ticker)
         for entry in pending:
-            raw, alpha, days = self._fetch_returns(ticker, entry["date"])
+            raw, alpha, days = self._fetch_returns(
+                ticker, entry["date"], holding_days=holding_days
+            )
             if raw is None:
                 continue  # price not available yet — try again next run
             reflection = self.reflector.reflect_on_final_decision(
                 final_decision=entry.get("decision", ""),
                 raw_return=raw,
                 alpha_return=alpha,
+                benchmark=benchmark,
             )
             updates.append({
                 "ticker": ticker,

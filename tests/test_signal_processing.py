@@ -51,8 +51,8 @@ class TestParseRating:
         )
         assert parse_rating(text) == "Sell"
 
-    def test_no_rating_returns_default(self):
-        assert parse_rating("No clear directional signal at this time.") == "Hold"
+    def test_no_rating_returns_none(self):
+        assert parse_rating("No clear directional signal at this time.") is None
 
     def test_no_rating_custom_default(self):
         assert parse_rating("Plain prose.", default="Underweight") == "Underweight"
@@ -85,6 +85,8 @@ class TestSignalProcessor:
         llm.invoke.assert_not_called()
         llm.with_structured_output.assert_not_called()
 
-    def test_default_when_no_rating_present(self):
+    def test_raises_when_no_rating_present(self):
+        # A parse failure must not silently become an actionable Hold signal.
         sp = SignalProcessor()
-        assert sp.process_signal("Plain prose without a recommendation.") == "Hold"
+        with pytest.raises(ValueError, match="Could not extract"):
+            sp.process_signal("Plain prose without a recommendation.")

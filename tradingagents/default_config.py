@@ -11,6 +11,13 @@ DEFAULT_CONFIG = {
     # the oldest resolved entries are pruned once this limit is exceeded.
     # Pending entries are never pruned. None disables rotation entirely.
     "memory_log_max_entries": None,
+    # Outcome attribution for the memory log. Returns are measured over
+    # memory_holding_days CALENDAR days (aligned by date, so 24/7 crypto and
+    # 5-day equity calendars compare over the same real-world window).
+    # benchmark_ticker overrides the automatic choice of BTC-USD for crypto
+    # pairs and SPY for everything else.
+    "memory_holding_days": 5,
+    "benchmark_ticker": None,
     # LLM settings
     "llm_provider": "openai",
     "deep_think_llm": "gpt-5.4",

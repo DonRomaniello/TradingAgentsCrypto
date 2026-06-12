@@ -35,7 +35,17 @@ def get_language_instruction() -> str:
 
 
 def build_instrument_context(ticker: str) -> str:
-    """Describe the exact instrument so agents preserve exchange-qualified tickers."""
+    """Describe the exact instrument so agents reason about the right asset class."""
+    from tradingagents.dataflows.utils import is_crypto_pair
+    if is_crypto_pair(ticker):
+        return (
+            f"The instrument to analyze is `{ticker}`, a cryptocurrency pair. "
+            "Use this exact ticker in every tool call, report, and recommendation. "
+            "This is a 24/7 market with no trading-day calendar, no company behind "
+            "it, no earnings, and no insiders. Do not apply equity framing "
+            "(quarterly results, management, sectors); focus on price action, "
+            "liquidity, news flow, regulatory developments, and adoption."
+        )
     return (
         f"The instrument to analyze is `{ticker}`. "
         "Use this exact ticker in every tool call, report, and recommendation, "

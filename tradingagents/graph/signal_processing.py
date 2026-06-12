@@ -27,5 +27,17 @@ class SignalProcessor:
         self.quick_thinking_llm = quick_thinking_llm
 
     def process_signal(self, full_signal: str) -> str:
-        """Return one of Buy / Overweight / Hold / Underweight / Sell."""
-        return parse_rating(full_signal)
+        """Return one of Buy / Overweight / Hold / Underweight / Sell.
+
+        Raises ``ValueError`` when no rating can be extracted: a decision
+        with no parseable rating is a pipeline failure, and silently treating
+        it as Hold would turn an LLM malfunction into an actionable signal.
+        """
+        rating = parse_rating(full_signal)
+        if rating is None:
+            raise ValueError(
+                "Could not extract a 5-tier rating from the Portfolio Manager "
+                f"decision; refusing to default to Hold. Decision text began: "
+                f"{full_signal[:200]!r}"
+            )
+        return rating

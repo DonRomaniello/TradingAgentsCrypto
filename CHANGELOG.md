@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Breaking changes within the 0.x line are called out explicitly.
 
+## [Unreleased]
+
+### Changed
+
+- **Crypto-aware pipeline.** Crypto pairs (e.g. `BTC-USD`) are now detected
+  and handled as a distinct asset class: financial-statement and
+  insider-transaction tools return explicit "not applicable" messages instead
+  of empty data the analysts would confabulate over; the fundamentals analyst
+  switches to an asset-profile prompt; and agent instrument context describes
+  a 24/7 market instead of equity framing.
+- **Return attribution fixed and benchmark made instrument-aware.** Memory-log
+  outcomes are now measured over a calendar-day window aligned by date on both
+  legs (previously raw and benchmark returns were aligned by row index, so
+  24/7 crypto and 5-day equity calendars covered different real-world
+  windows). Crypto pairs benchmark against BTC-USD, equities against SPY;
+  `benchmark_ticker` overrides, and self-benchmarking is suppressed. New
+  `memory_holding_days` config controls the window (default 5).
+- **Rating parse failures are loud.** `SignalProcessor.process_signal` raises
+  `ValueError` instead of silently returning "Hold" when no rating can be
+  extracted; memory-log entries with unparseable decisions are tagged
+  `Unrated` with a warning.
+- **Look-ahead guard for undated news.** In historical runs, yfinance articles
+  without a publish date are excluded instead of leaking into the window.
+
 ## [0.2.4] — 2026-04-25
 
 ### Added

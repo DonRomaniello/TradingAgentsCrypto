@@ -10,6 +10,12 @@ Breaking changes within the 0.x line are called out explicitly.
 
 ### Added
 
+- **Blind technical backtest mode** (`--blind`). The LLM rates an anonymized
+  asset: relative day labels instead of dates, closes rebased to 100, volume
+  rebased to mean 100, no ticker anywhere in the prompt. Memorization-
+  resistant even on pre-cutoff dates, and one LLM call per decision. News /
+  fundamentals / sentiment are excluded by design (they would de-anonymize
+  the asset).
 - **Backtesting harness** (`tradingagents/backtest/`, `scripts/run_backtest.py`).
   Runs the full pipeline over historical dates, maps ratings to long-only
   exposure, and simulates the equity curve with trading costs. Reports total

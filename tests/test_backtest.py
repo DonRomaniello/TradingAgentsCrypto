@@ -218,3 +218,99 @@ class TestReport:
         payload = json.loads(json_path.read_text())
         assert payload["metrics"]["n_decisions"] == 2
         assert len(payload["equity"]) == 3
+
+
+# ---------------------------------------------------------------------------
+# Blind technical mode: anonymization and decision parsing
+# ---------------------------------------------------------------------------
+
+
+def _ohlcv(start, n, base=50000.0, drift=1.002):
+    idx = pd.date_range(start=start, periods=n, freq="D")
+    close = pd.Series([base * drift**i for i in range(n)], index=idx)
+    return pd.DataFrame({
+        "Open": close * 0.99,
+        "High": close * 1.01,
+        "Low": close * 0.98,
+        "Close": close,
+        "Volume": pd.Series([1e9 + 1e7 * i for i in range(n)], index=idx),
+    })
+
+
+@pytest.mark.unit
+class TestBlindView:
+    def test_no_identifying_information_leaks(self):
+        from tradingagents.backtest.blind import prepare_blind_view
+        view = prepare_blind_view(_ohlcv("2025-10-01", 200), "2026-04-10")
+        # No ticker, no calendar dates, no absolute price levels.
+        assert "BTC" not in view and "USD" not in view
+        assert "2025" not in view and "2026" not in view
+        assert "50000" not in view and "50,000" not in view
+        # Bars are labelled by relative offset and rebased to 100.
+        assert "day 0" in view and "day -179" in view
+        assert "rebased to 100" in view
+
+    def test_lookahead_excluded(self):
+        from tradingagents.backtest.blind import prepare_blind_view
+        df = _ohlcv("2026-01-01", 120)
+        # Spike after the decision date must not appear in the view.
+        df.loc[df.index[-1], "Close"] = 9_999_999.0
+        view = prepare_blind_view(df, str(df.index[-2].date()))
+        assert "9999999" not in view.replace(",", "")
+
+    def test_rebase_normalises_first_close(self):
+        from tradingagents.backtest.blind import prepare_blind_view
+        # Two assets at wildly different price levels produce the same view.
+        a = prepare_blind_view(_ohlcv("2026-01-01", 60, base=50000.0), "2026-03-01")
+        b = prepare_blind_view(_ohlcv("2026-01-01", 60, base=0.37), "2026-03-01")
+        assert a == b
+
+    def test_insufficient_history_raises(self):
+        from tradingagents.backtest.blind import prepare_blind_view
+        with pytest.raises(ValueError, match="at least 30 bars"):
+            prepare_blind_view(_ohlcv("2026-01-01", 10), "2026-01-10")
+
+
+@pytest.mark.unit
+class TestBlindDecideFn:
+    def _llm(self, reply):
+        from unittest.mock import MagicMock
+        llm = MagicMock()
+        llm.invoke.return_value.content = reply
+        return llm
+
+    def test_returns_parsed_rating_and_hides_ticker(self):
+        from tradingagents.backtest.blind import make_blind_decide_fn
+        llm = self._llm("Uptrend with momentum.\nRating: Overweight")
+        decide = make_blind_decide_fn(
+            llm, ohlcv_loader=lambda t, s, e: _ohlcv("2025-10-01", 250)
+        )
+        assert decide("BTC-USD", "2026-04-01") == "Overweight"
+        # The ticker must never reach the LLM.
+        for call in llm.invoke.call_args_list:
+            for _role, content in call.args[0]:
+                assert "BTC" not in content
+
+    def test_unparseable_reply_raises(self):
+        from tradingagents.backtest.blind import make_blind_decide_fn
+        decide = make_blind_decide_fn(
+            self._llm("To the moon!"),
+            ohlcv_loader=lambda t, s, e: _ohlcv("2025-10-01", 250),
+        )
+        with pytest.raises(ValueError, match="no parseable rating"):
+            decide("BTC-USD", "2026-04-01")
+
+    def test_ohlcv_fetched_once_per_ticker(self):
+        from tradingagents.backtest.blind import make_blind_decide_fn
+        loads = []
+
+        def loader(t, s, e):
+            loads.append(t)
+            return _ohlcv("2025-10-01", 250)
+
+        decide = make_blind_decide_fn(
+            self._llm("Rating: Hold"), ohlcv_loader=loader
+        )
+        decide("BTC-USD", "2026-04-01")
+        decide("BTC-USD", "2026-04-08")
+        assert loads == ["BTC-USD"]

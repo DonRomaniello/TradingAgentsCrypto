@@ -260,6 +260,16 @@ The report (markdown + JSON) compares the strategy against buy-and-hold on total
 
 Two honesty caveats, also printed in every report: news and fundamentals are not point-in-time for historical dates (prices, indicators, funding rates, and the Fear & Greed index are), and the LLM may have post-hoc knowledge of the period — results on dates before the model's knowledge cutoff are optimistic at best.
 
+### Blind technical mode
+
+`--blind` addresses the memorization problem directly: the LLM never sees the ticker, calendar dates, or absolute price levels. It gets a technical snapshot with bars labelled by relative day (day -179 … day 0), closes rebased to 100 at the window start, and volume rebased to a mean of 100 — pure chart shape, nothing to recall the asset or period by.
+
+```bash
+python scripts/run_backtest.py BTC-USD 2024-01-01 2025-01-01 --blind --every 7
+```
+
+Blind mode is one LLM call per decision (cheap — a year of weekly decisions costs ~52 calls instead of ~52 full pipeline runs) and produces memorization-resistant results even on dates well before the model's knowledge cutoff. The trade-off is explicit: news, fundamentals, funding, and sentiment are excluded, because any of them would de-anonymize the asset. Use blind mode to measure whether the model's technical judgment adds value; use the full pipeline forward (paper-trading from today) to measure the whole system.
+
 ## Contributing
 
 We welcome contributions from the community! Whether it's fixing a bug, improving documentation, or suggesting a new feature, your input helps make this project better. If you are interested in this line of research, please consider joining our open-source financial AI research community [Tauric Research](https://tauric.ai/).
